@@ -32,6 +32,8 @@ if (persisted) {
   world.crews.clear();
 }
 
+const lobbies = new Map();
+
 const wss = new WebSocketServer({ port: PORT });
 
 console.log(`[Tides Server] Running on ws://localhost:${PORT}`);
@@ -54,10 +56,10 @@ function findCrewById(crewId) {
   return world.crews.get(crewId) ?? null;
 }
 
-function createCrew({ name = 'Crew', openCrew = true }) {
-  const crewId = randomUUID();
+function createCrew({ name = 'Crew', openCrew = true, crewId = null }) {
+  const resolvedCrewId = crewId ?? randomUUID();
   const crew = {
-    crewId,
+    crewId: resolvedCrewId,
     name,
     captainId: null,
     shipId: null,
@@ -65,14 +67,144 @@ function createCrew({ name = 'Crew', openCrew = true }) {
     allianceWith: null,
     memberIds: []
   };
-  world.crews.set(crewId, crew);
+  world.crews.set(resolvedCrewId, crew);
   return crew;
 }
 
 function resolveCrewForJoin(msg) {
-  const requestedCrew = findCrewById(msg.crewId);
-  if (requestedCrew && requestedCrew.openCrew) return requestedCrew;
+  const requestedCrewId = msg.crewId ? String(msg.crewId) : null;
+  const requestedCrew = findCrewById(requestedCrewId);
+  if (requestedCrew) return requestedCrew;
+  if (requestedCrewId && !requestedCrew) {
+    return createCrew({ crewId: requestedCrewId, name: msg.crewName ?? `Crew ${requestedCrewId}`, openCrew: msg.openCrew !== false });
+  }
   return createCrew({ name: msg.crewName ?? 'Open Crew', openCrew: msg.openCrew !== false });
+}
+
+function generateLobbyCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  do {
+    code = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  } while (lobbies.has(code));
+  return code;
+}
+
+function getLobbyMembersPayload(lobby) {
+  return lobby.members.map((m) => ({
+    name: m.name,
+    role: m.role,
+    isHost: m.isHost
+  }));
+}
+
+function sendLobbyUpdate(lobby) {
+  const payload = {
+    type: 'lobby:update',
+    code: lobby.code,
+    shipType: lobby.shipType,
+    openCrew: lobby.openCrew,
+    crewName: lobby.crewName,
+    members: getLobbyMembersPayload(lobby)
+  };
+  for (const member of lobby.members) safeSend(member.ws, payload);
+}
+
+function removeFromLobby(ws) {
+  if (!ws.lobbyCode) return;
+  const lobby = lobbies.get(ws.lobbyCode);
+  ws.lobbyCode = null;
+  if (!lobby) return;
+
+  lobby.members = lobby.members.filter((m) => m.ws !== ws);
+  if (!lobby.members.length) {
+    lobbies.delete(lobby.code);
+    return;
+  }
+
+  if (lobby.hostWs === ws) {
+    const replacement = lobby.members[0];
+    replacement.isHost = true;
+    lobby.hostWs = replacement.ws;
+    safeSend(replacement.ws, { type: 'lobby:host-transfer', code: lobby.code, message: 'You are now the host.' });
+  }
+
+  sendLobbyUpdate(lobby);
+}
+
+function handleLobbyCreate(ws, msg) {
+  removeFromLobby(ws);
+  const code = generateLobbyCode();
+  const lobby = {
+    code,
+    createdAt: now(),
+    hostWs: ws,
+    shipType: msg.shipType ?? 'skiff',
+    openCrew: msg.openCrew !== false,
+    crewName: msg.crewName ?? `${msg.name ?? 'Captain'} Crew`,
+    members: [{ ws, name: msg.name ?? 'Captain', role: msg.role ?? 'helmsman', isHost: true }]
+  };
+  lobbies.set(code, lobby);
+  ws.lobbyCode = code;
+
+  safeSend(ws, {
+    type: 'lobby:created',
+    code,
+    shipType: lobby.shipType,
+    openCrew: lobby.openCrew,
+    crewName: lobby.crewName,
+    members: getLobbyMembersPayload(lobby)
+  });
+}
+
+function handleLobbyJoin(ws, msg) {
+  removeFromLobby(ws);
+  const code = String(msg.code ?? '').trim().toUpperCase();
+  if (!code) return safeSend(ws, { type: 'error', message: 'Lobby code is required.' });
+  const lobby = lobbies.get(code);
+  if (!lobby) return safeSend(ws, { type: 'error', message: 'Lobby not found.' });
+
+  lobby.members.push({ ws, name: msg.name ?? 'Crewmate', role: msg.role ?? 'helmsman', isHost: false });
+  ws.lobbyCode = code;
+
+  safeSend(ws, {
+    type: 'lobby:joined',
+    code,
+    shipType: lobby.shipType,
+    openCrew: lobby.openCrew,
+    crewName: lobby.crewName,
+    members: getLobbyMembersPayload(lobby)
+  });
+  sendLobbyUpdate(lobby);
+}
+
+function handleLobbyStart(ws, msg) {
+  const code = ws.lobbyCode;
+  const lobby = code ? lobbies.get(code) : null;
+  if (!lobby) return safeSend(ws, { type: 'error', message: 'No active lobby.' });
+  if (lobby.hostWs !== ws) return safeSend(ws, { type: 'error', message: 'Only host can set sail.' });
+
+  lobby.shipType = msg.shipType ?? lobby.shipType;
+  lobby.openCrew = msg.openCrew !== false;
+  lobby.crewName = msg.crewName ?? lobby.crewName;
+
+  const crewId = `lobby_${lobby.code}`;
+  for (const member of lobby.members) {
+    safeSend(member.ws, {
+      type: 'lobby:started',
+      code: lobby.code,
+      wsUrl: `ws://localhost:${PORT}`,
+      crewId,
+      shipType: lobby.shipType,
+      openCrew: lobby.openCrew,
+      crewName: lobby.crewName,
+      role: member.role,
+      playerName: member.name
+    });
+    member.ws.lobbyCode = null;
+  }
+
+  lobbies.delete(lobby.code);
 }
 
 function handleJoin(ws, msg) {
@@ -297,6 +429,9 @@ wss.on('connection', (ws) => {
     try {
       const msg = JSON.parse(String(raw));
       if (msg.type === 'join') return handleJoin(ws, msg);
+      if (msg.type === 'lobby:create') return handleLobbyCreate(ws, msg);
+      if (msg.type === 'lobby:join') return handleLobbyJoin(ws, msg);
+      if (msg.type === 'lobby:start') return handleLobbyStart(ws, msg);
       if (msg.type === 'input') return handleInput(ws, msg);
       if (msg.type === 'role:set') return handleRoleSet(ws, msg);
       if (msg.type === 'crew:open-mode') return handleCrewOpenMode(ws, msg);
@@ -309,6 +444,7 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
+    removeFromLobby(ws);
     if (!ws.playerId) return;
     const player = world.players.get(ws.playerId);
     if (player?.crewId) {

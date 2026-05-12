@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { FACTIONS, SHIP_CLASSES } from '../data/gddData.js';
+import { NetworkClient } from '../systems/NetworkClient.js';
 import { factionRank, loadProfile, saveProfile } from '../systems/ProfileSystem.js';
 
 export class MenuScene extends Phaser.Scene {
@@ -15,6 +16,10 @@ export class MenuScene extends Phaser.Scene {
     this.openCrew = true;
     this.profile = null;
     this.viewMode = 'sail';
+    this.lobbyState = null;
+    this.lobbyMode = 'idle';
+    this.lobbyCodeInput = '';
+    this.lobbyJoinCode = '';
   }
 
   create() {
@@ -49,6 +54,18 @@ export class MenuScene extends Phaser.Scene {
 
     this.footerLabel = this.add.text(width / 2, height - 66, 'Controls: click tabs or use [1]/[2]/[3]. Left/Right changes ship. Up/Down changes faction. Enter launches. B buys. F sets flagship.', { fontSize: '13px', color: '#6f8fa6', align: 'center' }).setOrigin(0.5);
 
+    this.lobbyPanel = this.add.rectangle(width / 2, height / 2 + 210, 860, 98, 0x081722, 0.92).setStrokeStyle(2, 0x31526d, 0.8);
+    this.lobbyTitle = this.add.text(width / 2 - 392, height / 2 + 170, 'Lobby', { fontSize: '18px', color: '#ffe7b0', fontStyle: 'bold' });
+    this.lobbyText = this.add.text(width / 2 - 392, height / 2 + 198, '', { fontSize: '14px', color: '#eef8ff', wordWrap: { width: 740 }, lineSpacing: 6 });
+    this.lobbyHint = this.add.text(width / 2 - 392, height / 2 + 245, '', { fontSize: '12px', color: '#9fc0d6', wordWrap: { width: 740 } });
+    this.lobbyButtons = {
+      create: this.createButton(width / 2 - 240, height / 2 + 206, 150, 34, 'CREATE LOBBY', () => this.createLobby()),
+      join: this.createButton(width / 2 - 76, height / 2 + 206, 150, 34, 'JOIN LOBBY', () => this.enterJoinMode()),
+      start: this.createButton(width / 2 + 88, height / 2 + 206, 150, 34, 'SET SAIL', () => this.startLobby())
+    };
+    this.lobbyButtons.start.setVisible(false);
+    this.lobbyCodeText = this.add.text(width / 2 + 248, height / 2 + 198, '', { fontSize: '18px', color: '#9ef0ff', fontStyle: 'bold' }).setOrigin(0, 0);
+
     this.input.keyboard.on('keydown-ONE', () => this.setViewMode('sail'));
     this.input.keyboard.on('keydown-TWO', () => this.setViewMode('shop'));
     this.input.keyboard.on('keydown-THREE', () => this.setViewMode('fleet'));
@@ -63,10 +80,29 @@ export class MenuScene extends Phaser.Scene {
     this.input.keyboard.on('keydown-O', () => this.toggleOpenCrew());
     this.input.keyboard.on('keydown-B', () => this.buySelectedShip());
     this.input.keyboard.on('keydown-F', () => this.setFlagshipShip());
-    this.input.keyboard.on('keydown-ENTER', () => this.startGame());
-    this.input.keyboard.on('keydown-RETURN', () => this.startGame());
+
+    this.input.keyboard.on('keydown-BACKSPACE', () => {
+      if (this.lobbyMode === 'join' && this.lobbyJoinCode.length > 0) {
+        this.lobbyJoinCode = this.lobbyJoinCode.slice(0, -1);
+        this.refreshLobbyUI();
+      }
+    });
+    this.input.keyboard.on('keydown-ENTER', () => {
+      if (this.lobbyMode === 'join') return this.joinLobby();
+      if (this.lobbyState?.isHost) return this.startLobby();
+      this.startGame();
+    });
+
+    this.input.keyboard.on('keydown', (event) => this.handleLobbyKeyboard(event));
+
+    this.setupLobbyClient();
 
     this.refreshLabels();
+  }
+
+  setupLobbyClient() {
+    this.lobbyClient = null;
+    this.lobbyStatus = 'Offline';
   }
 
   createTabButton(x, y, label, mode) {
@@ -95,6 +131,136 @@ export class MenuScene extends Phaser.Scene {
   setViewMode(mode) {
     this.viewMode = mode;
     this.refreshLabels();
+  }
+
+  handleLobbyKeyboard(event) {
+    if (this.lobbyMode !== 'join') return;
+    const key = event.key?.toUpperCase?.() ?? '';
+    if (/^[A-Z0-9]$/.test(key) && this.lobbyJoinCode.length < 6) {
+      this.lobbyJoinCode += key;
+      this.refreshLobbyUI();
+    }
+  }
+
+  connectLobbyClient() {
+    if (this.lobbyClient?.connected) return this.lobbyClient;
+    if (!this.lobbyClient) this.lobbyClient = new NetworkClient('ws://localhost:2567');
+
+    this.lobbyClient.onLobbyCreated = (msg) => {
+      this.lobbyState = { code: msg.code, shipType: msg.shipType, openCrew: msg.openCrew, crewName: msg.crewName, members: msg.members ?? [], isHost: true };
+      this.lobbyMode = 'host';
+      this.refreshLobbyUI();
+    };
+    this.lobbyClient.onLobbyJoined = (msg) => {
+      this.lobbyState = { code: msg.code, shipType: msg.shipType, openCrew: msg.openCrew, crewName: msg.crewName, members: msg.members ?? [], isHost: false };
+      this.lobbyMode = 'join-wait';
+      this.refreshLobbyUI();
+    };
+    this.lobbyClient.onLobbyUpdate = (msg) => {
+      if (!this.lobbyState || this.lobbyState.code !== msg.code) return;
+      this.lobbyState = { ...this.lobbyState, shipType: msg.shipType, openCrew: msg.openCrew, crewName: msg.crewName, members: msg.members ?? [], isHost: this.lobbyState.isHost };
+      this.refreshLobbyUI();
+    };
+    this.lobbyClient.onLobbyStarted = (msg) => {
+      this.lobbyState = null;
+      this.lobbyMode = 'idle';
+      this.lobbyJoinCode = '';
+      this.refreshLobbyUI();
+      this.lobbyClient?.disconnect();
+      this.lobbyClient = null;
+      this.scene.start('OceanScene', {
+        shipType: msg.shipType,
+        faction: this.factionKeys[this.factionIndex],
+        profile: this.profile,
+        crewCount: this.crewCount,
+        crewRole: this.roleKeys[this.roleIndex],
+        openCrew: msg.openCrew,
+        crewName: msg.crewName,
+        lobbyCode: msg.code,
+        networkUrl: msg.wsUrl,
+        networkCrewId: msg.crewId,
+        networkPlayerName: msg.playerName,
+        isNetworkSession: true,
+        waitForLobbyStart: false
+      });
+    };
+    return this.lobbyClient;
+  }
+
+  refreshLobbyUI() {
+    const code = this.lobbyState?.code ?? this.lobbyCodeInput;
+    const members = this.lobbyState?.members ?? [];
+    const modeText = this.lobbyMode === 'join' ? `Enter Code: ${this.lobbyJoinCode || '______'}` : this.lobbyState ? `Lobby Code: ${code}` : 'No active lobby';
+    const memberText = members.length ? members.map((m, idx) => `${idx + 1}. ${m.name}${m.isHost ? ' (Host)' : ''}`).join('   ') : 'No lobby members yet.';
+    this.lobbyText.setText([modeText, memberText]);
+    this.lobbyHint.setText(
+      this.lobbyMode === 'join'
+        ? 'Type the 6-character code and press Enter to join.'
+        : this.lobbyState?.isHost
+          ? 'Wait for others to join, then press Set Sail.'
+          : this.lobbyState
+            ? 'Waiting for host to set sail.'
+            : 'Create a lobby to host, or join with a code.'
+    );
+    this.lobbyCodeText.setText(this.lobbyState?.code ?? '');
+    this.lobbyButtons.start.setVisible(Boolean(this.lobbyState?.isHost));
+  }
+
+  createLobby() {
+    const client = this.connectLobbyClient();
+    client.connect({
+      name: this.profile?.name ?? 'Captain',
+      shipType: this.getLaunchShipKey(),
+      crewId: null,
+      role: this.roleKeys[this.roleIndex],
+      openCrew: this.openCrew,
+      crewName: `${FACTIONS[this.factionKeys[this.factionIndex]].name} Crew`,
+      autoJoin: false
+    }).then(() => {
+      client.createLobby({
+        name: this.profile?.name ?? 'Captain',
+        shipType: this.getLaunchShipKey(),
+        role: this.roleKeys[this.roleIndex],
+        openCrew: this.openCrew,
+        crewName: `${FACTIONS[this.factionKeys[this.factionIndex]].name} Crew`
+      });
+    }).catch(() => this.setStatusMessage('Lobby host connection failed.'));
+  }
+
+  enterJoinMode() {
+    this.lobbyMode = 'join';
+    this.lobbyJoinCode = '';
+    this.refreshLobbyUI();
+  }
+
+  joinLobby() {
+    const code = this.lobbyJoinCode.trim().toUpperCase();
+    if (code.length !== 6) return this.setStatusMessage('Enter the 6-character lobby code.');
+    const client = this.connectLobbyClient();
+    client.connect({
+      name: this.profile?.name ?? 'Crewmate',
+      shipType: this.getLaunchShipKey(),
+      crewId: null,
+      role: this.roleKeys[this.roleIndex],
+      openCrew: true,
+      crewName: `${FACTIONS[this.factionKeys[this.factionIndex]].name} Crew`,
+      autoJoin: false
+    }).then(() => {
+      client.joinLobby(code, {
+        name: this.profile?.name ?? 'Crewmate',
+        role: this.roleKeys[this.roleIndex]
+      });
+    }).catch(() => this.setStatusMessage('Lobby join failed.'));
+  }
+
+  startLobby() {
+    const client = this.connectLobbyClient();
+    if (!this.lobbyState?.isHost) return this.setStatusMessage('Only the host can set sail.');
+    client.startLobby({
+      shipType: this.getLaunchShipKey(),
+      openCrew: this.openCrew,
+      crewName: `${FACTIONS[this.factionKeys[this.factionIndex]].name} Crew`
+    });
   }
 
   setStatusMessage(message) {

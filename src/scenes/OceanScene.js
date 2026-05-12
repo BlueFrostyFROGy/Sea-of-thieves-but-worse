@@ -20,6 +20,10 @@ export class OceanScene extends Phaser.Scene {
     this.crewRole = payload.crewRole ?? 'helmsman';
     this.openCrew = payload.openCrew ?? true;
     this.crewName = payload.crewName ?? 'Open Crew';
+    this.networkUrl = payload.networkUrl ?? null;
+    this.networkCrewId = payload.networkCrewId ?? null;
+    this.networkPlayerName = payload.networkPlayerName ?? null;
+    this.isNetworkSession = Boolean(payload.isNetworkSession);
     this.sceneFailed = false;
   }
 
@@ -61,10 +65,11 @@ export class OceanScene extends Phaser.Scene {
     this.networkEnabled = false;
 
     const params = new URLSearchParams(window.location.search);
-    if (params.get('net') !== '1') return;
+    const shouldConnect = this.isNetworkSession || params.get('net') === '1';
+    if (!shouldConnect) return;
 
     this.networkEnabled = true;
-    this.network = new NetworkClient(params.get('ws') ?? 'ws://localhost:2567');
+    this.network = new NetworkClient(this.networkUrl ?? params.get('ws') ?? 'ws://localhost:2567');
     this.network.onSnapshot = (snapshot) => this.applyNetworkSnapshot(snapshot);
     this.network.onSessionWarning = (msg) => this.pushToast(msg.message);
     this.network.onSessionReset = (msg) => this.pushToast(msg.message);
@@ -75,9 +80,9 @@ export class OceanScene extends Phaser.Scene {
     };
 
     this.network.connect({
-      name: 'LocalCaptain',
+      name: this.networkPlayerName ?? 'LocalCaptain',
       shipType: this.shipType,
-      crewId: this.faction,
+      crewId: this.networkCrewId ?? this.faction,
       role: this.state.crewRole,
       openCrew: this.openCrew,
       crewName: this.crewName
