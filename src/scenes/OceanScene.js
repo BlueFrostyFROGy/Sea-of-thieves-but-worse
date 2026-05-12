@@ -274,7 +274,8 @@ export class OceanScene extends Phaser.Scene {
         island.buildings.push(fortPole, fortFlag, fortFlagLabel, vaultBase, vaultDoor, vaultLock, vaultPole, vaultFlag, vaultFlagLabel, vaultLabel);
         const fortState = {
           island, enemyCount: 0, cleared: false, started: false, keySpawned: false, opened: false,
-          keySprite: null, keyGlowSprite: null, fortFlag, fortFlagLabel, vaultFlag, vaultFlagLabel, vaultLock, vaultDoor, vaultLabel
+          keySprite: null, keyGlowSprite: null, fortFlag, fortFlagLabel, vaultFlag, vaultFlagLabel, vaultLock, vaultDoor, vaultLabel,
+          bossSpawned: false
         };
         this.seafortStates.set(island.id, fortState);
         continue;
@@ -542,6 +543,30 @@ export class OceanScene extends Phaser.Scene {
       ).setDepth(9);
       const skeletonObj = { sprite: enemy, islandId: island.id, fortId: island.id, hp, cooldown: Phaser.Math.FloatBetween(1.2, 2.2), stagger: 0 };
       this.skeletons.push(skeletonObj);
+    }
+
+    if (isFort) {
+      const fort = this.seafortStates?.get(island.id);
+      const bossAlreadyAlive = this.skeletons.some((s) => s.fortId === island.id && s.isBoss && s.hp > 0);
+      if (!bossAlreadyAlive) {
+        const boss = this.add.rectangle(
+          island.x + Phaser.Math.Between(-26, 26),
+          island.y + Phaser.Math.Between(-26, 26),
+          28,
+          36,
+          island.type === 'skullfort' ? 0x7d1717 : 0xbdbdbd
+        ).setDepth(9.3);
+        this.skeletons.push({
+          sprite: boss,
+          islandId: island.id,
+          fortId: island.id,
+          hp: island.type === 'skullfort' ? 900 : 700,
+          cooldown: Phaser.Math.FloatBetween(0.9, 1.4),
+          stagger: 0,
+          isBoss: true
+        });
+        if (fort) fort.bossSpawned = true;
+      }
     }
   }
 
@@ -1103,14 +1128,15 @@ export class OceanScene extends Phaser.Scene {
       if (enemy.hp <= 0) continue;
       const d = Phaser.Math.Distance.Between(this.playerPawn.x, this.playerPawn.y, enemy.sprite.x, enemy.sprite.y);
       if (d <= 34) {
-        enemy.hp -= Math.floor(45 * meleeMult);
+        const meleeDamage = Math.floor((enemy.isBoss ? 38 : 45) * meleeMult);
+        enemy.hp -= meleeDamage;
         enemy.stagger = 0.3;
         if (enemy.hp <= 0) {
           enemy.sprite.destroy();
-          this.state.gold += 45;
+          this.state.gold += enemy.isBoss ? 850 : 45;
           this.state.unbankedRep += 2;
           this.state.addSkeletonDefeatCredit();
-          this.pushToast('Skeleton defeated.');
+          this.pushToast(enemy.isBoss ? 'Fort boss defeated!' : 'Skeleton defeated.');
         }
       }
     }
@@ -1140,11 +1166,12 @@ export class OceanScene extends Phaser.Scene {
       let hit = false;
       for (const enemy of this.skeletons) {
         if (enemy.hp <= 0) continue;
-        if (Phaser.Math.Distance.Between(s.sprite.x, s.sprite.y, enemy.sprite.x, enemy.sprite.y) < 12) {
+        const hitRadius = enemy.isBoss ? 18 : 12;
+        if (Phaser.Math.Distance.Between(s.sprite.x, s.sprite.y, enemy.sprite.x, enemy.sprite.y) < hitRadius) {
           enemy.hp -= s.damage;
           if (enemy.hp <= 0) {
             enemy.sprite.destroy();
-            this.state.gold += 45;
+            this.state.gold += enemy.isBoss ? 850 : 45;
             this.state.addSkeletonDefeatCredit();
           }
           hit = true;
@@ -1182,11 +1209,12 @@ export class OceanScene extends Phaser.Scene {
 
       const s = skeleton.sprite;
       const dist = Phaser.Math.Distance.Between(s.x, s.y, this.playerPawn.x, this.playerPawn.y);
-      if (dist > 240) continue;
+      if (dist > (skeleton.isBoss ? 320 : 240)) continue;
 
       const ang = Phaser.Math.Angle.Between(s.x, s.y, this.playerPawn.x, this.playerPawn.y);
-      let moveX = Math.cos(ang) * 68 * dt;
-      let moveY = Math.sin(ang) * 68 * dt;
+      const chaseSpeed = skeleton.isBoss ? 52 : 68;
+      let moveX = Math.cos(ang) * chaseSpeed * dt;
+      let moveY = Math.sin(ang) * chaseSpeed * dt;
 
       // Separation: steer away from other skeletons that are too close
       for (const other of this.skeletons) {
@@ -1204,14 +1232,14 @@ export class OceanScene extends Phaser.Scene {
       s.y += moveY;
 
       skeleton.cooldown -= dt;
-      if (dist < 20 && skeleton.cooldown <= 0) {
-        skeleton.cooldown = Phaser.Math.FloatBetween(1.0, 1.8);
+      if (dist < (skeleton.isBoss ? 28 : 20) && skeleton.cooldown <= 0) {
+        skeleton.cooldown = Phaser.Math.FloatBetween(skeleton.isBoss ? 0.8 : 1.0, skeleton.isBoss ? 1.4 : 1.8);
         if (this.parryWindow > 0) {
           skeleton.stagger = 0.8;
           this.pushToast('Parry successful.');
         } else {
-          this.state.damagePlayer(18);
-          this.pushToast('You were hit by a skeleton.');
+          this.state.damagePlayer(skeleton.isBoss ? 34 : 18);
+          this.pushToast(skeleton.isBoss ? 'The fort boss crushed you!' : 'You were hit by a skeleton.');
         }
       }
     }
@@ -1486,6 +1514,51 @@ export class OceanScene extends Phaser.Scene {
         }
       }
 
+      // Land target hit check (skeletons and fort bosses)
+      for (const skel of this.skeletons) {
+        if (skel.hp <= 0) continue;
+        const hitRadius = skel.isBoss ? 20 : 13;
+        if (Phaser.Math.Distance.Between(ball.sprite.x, ball.sprite.y, skel.sprite.x, skel.sprite.y) < hitRadius) {
+          skel.hp -= Math.floor((ball.damage ?? 120) * (skel.isBoss ? 0.85 : 1));
+          if ((ball.splash ?? 0) > 0) {
+            for (const nearby of this.skeletons) {
+              if (nearby.hp <= 0 || nearby === skel) continue;
+              if (Phaser.Math.Distance.Between(ball.sprite.x, ball.sprite.y, nearby.sprite.x, nearby.sprite.y) <= ball.splash) {
+                nearby.hp -= Math.floor((ball.damage ?? 120) * 0.45);
+              }
+            }
+          }
+          if (skel.hp <= 0) {
+            skel.sprite.destroy();
+            this.state.gold += skel.isBoss ? 850 : 45;
+            this.state.addSkeletonDefeatCredit();
+            this.pushToast(skel.isBoss ? 'Fort boss obliterated by cannon fire!' : 'Skeleton blasted by cannon fire!');
+          }
+          return true;
+        }
+      }
+
+      // Cannonballs now collide with landmasses; splash can still damage nearby land targets.
+      for (const island of this.world.islands) {
+        const islandDist = Phaser.Math.Distance.Between(ball.sprite.x, ball.sprite.y, island.x, island.y);
+        if (islandDist <= island.radius + 2) {
+          if ((ball.splash ?? 0) > 0) {
+            for (const skel of this.skeletons) {
+              if (skel.hp <= 0) continue;
+              if (Phaser.Math.Distance.Between(ball.sprite.x, ball.sprite.y, skel.sprite.x, skel.sprite.y) <= ball.splash + (skel.isBoss ? 8 : 0)) {
+                skel.hp -= Math.floor((ball.damage ?? 120) * 0.35);
+                if (skel.hp <= 0) {
+                  skel.sprite.destroy();
+                  this.state.gold += skel.isBoss ? 850 : 45;
+                  this.state.addSkeletonDefeatCredit();
+                }
+              }
+            }
+          }
+          return true;
+        }
+      }
+
       return false;
     });
 
@@ -1545,7 +1618,8 @@ export class OceanScene extends Phaser.Scene {
           if (fort.vaultLock) fort.vaultLock.setFillStyle(0x44cc44);
           if (fort.vaultLabel?.setText) fort.vaultLabel.setText('OPEN');
           if (fort.vaultFlag) fort.vaultFlag.setFillStyle(0x7cffc8);
-          const chestCount = Phaser.Math.Between(5, 10);
+          const bossVault = Boolean(fort.bossSpawned);
+          const chestCount = bossVault ? Phaser.Math.Between(12, 20) : Phaser.Math.Between(5, 10);
           for (let c = 0; c < chestCount; c++) {
             const ca = Phaser.Math.FloatBetween(0, Math.PI * 2);
             const cd = Phaser.Math.Between(16, Math.max(22, Math.floor(fort.island.radius * 0.45)));
@@ -1555,9 +1629,11 @@ export class OceanScene extends Phaser.Scene {
             const cl = this.add.rectangle(cx, cy - 1, 20, 7, 0xc9963f).setDepth(8);
             const ck = this.add.rectangle(cx, cy + 2, 5, 5, 0xdeb359).setDepth(8.2);
             const cs = this.add.circle(cx + 11, cy - 9, 3, 0xffe8a8, 0.9).setDepth(9);
-            this.lootNodes.push({ x: cx, y: cy, taken: false, zone: fort.island.zone, sourceType: 'seafortVault', islandId: fort.island.id, requiresDive: false, sprites: [cb, cl, cs, ck] });
+            this.lootNodes.push({ x: cx, y: cy, taken: false, zone: fort.island.zone, sourceType: bossVault ? 'bossVault' : 'seafortVault', valueMult: bossVault ? 2.6 : 1, islandId: fort.island.id, requiresDive: false, sprites: [cb, cl, cs, ck] });
           }
-          this.pushToast(`Vault opened! ${chestCount} treasure chests inside!`);
+          this.pushToast(bossVault
+            ? `Boss Vault opened! ${chestCount} high-value treasure chests inside!`
+            : `Vault opened! ${chestCount} treasure chests inside!`);
           return;
         } else {
           this.pushToast('Move deeper into the fort to use the vault key [E].');
@@ -1636,6 +1712,9 @@ export class OceanScene extends Phaser.Scene {
         const zone = ZONES.find((z) => z.key === pickupNode.zone);
         const treasure = this.state.rollTreasure(zone?.danger ?? 1);
         treasure.fromType = pickupNode.sourceType;
+        if (pickupNode.valueMult && pickupNode.valueMult > 1) {
+          treasure.baseValue = Math.floor(treasure.baseValue * pickupNode.valueMult);
+        }
         this.carriedLoot = treasure;
         pickupNode.taken = true;
         pickupNode.sprites.forEach((s) => s.setVisible(false));

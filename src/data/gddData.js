@@ -7,9 +7,9 @@ export const ZONES = [
 
 export const SHIP_CLASSES = {
   skiff: { label: 'Skiff', cost: 0, hp: 800, cannons: 2, sails: 1, cargo: 4, turnRate: 0.12, accel: 8.3, drag: 0.988, anchorRaiseSec: 2.5, minCrew: 1, optimalCrew: 2, maxCrew: 2 },
-  brigantine: { label: 'Brigantine', cost: 3000, hp: 1600, cannons: 4, sails: 2, cargo: 10, turnRate: 0.1, accel: 7.6, drag: 0.986, anchorRaiseSec: 4, minCrew: 1, optimalCrew: 3, maxCrew: 4 },
-  galleon: { label: 'Galleon', cost: 9000, hp: 3200, cannons: 8, sails: 4, cargo: 24, turnRate: 0.075, accel: 6.8, drag: 0.983, anchorRaiseSec: 6, minCrew: 2, optimalCrew: 6, maxCrew: 8 },
-  warship: { label: 'Warship', cost: 18000, hp: 5000, cannons: 12, sails: 5, cargo: 32, turnRate: 0.06, accel: 6.4, drag: 0.981, anchorRaiseSec: 7.5, minCrew: 4, optimalCrew: 7, maxCrew: 8 }
+  brigantine: { label: 'Brigantine', cost: 25000, hp: 1600, cannons: 4, sails: 2, cargo: 10, turnRate: 0.1, accel: 7.6, drag: 0.986, anchorRaiseSec: 4, minCrew: 1, optimalCrew: 3, maxCrew: 4 },
+  galleon: { label: 'Galleon', cost: 90000, hp: 3200, cannons: 8, sails: 4, cargo: 24, turnRate: 0.075, accel: 6.8, drag: 0.983, anchorRaiseSec: 6, minCrew: 2, optimalCrew: 6, maxCrew: 8 },
+  warship: { label: 'Warship', cost: 180000, hp: 5000, cannons: 12, sails: 5, cargo: 32, turnRate: 0.06, accel: 6.4, drag: 0.981, anchorRaiseSec: 7.5, minCrew: 4, optimalCrew: 7, maxCrew: 8 }
 };
 
 export const FACTIONS = {
@@ -21,15 +21,15 @@ export const FACTIONS = {
 };
 
 export const TREASURE_TABLE = [
-  { id: 'saltmossCoffer', tier: 'driftwoodFinds', name: 'Saltmoss Coffer', min: 50, max: 150, weight: 30 },
-  { id: 'deadmanSatchel', tier: 'driftwoodFinds', name: "Deadman's Satchel", min: 80, max: 200, weight: 25 },
-  { id: 'crewLockbox', tier: 'driftwoodFinds', name: 'Crewman Lockbox', min: 100, max: 250, weight: 22 },
-  { id: 'crimsonTrove', tier: 'captainsPlunder', name: 'Crimson Trove', min: 600, max: 1100, weight: 11 },
-  { id: 'ironjawStrongbox', tier: 'captainsPlunder', name: 'Ironjaw Strongbox', min: 700, max: 1200, weight: 10 },
-  { id: 'dreadcrownCasket', tier: 'warlordsVaults', name: 'Dreadcrown Casket', min: 5000, max: 8000, weight: 4 },
-  { id: 'stormboundVault', tier: 'warlordsVaults', name: 'Stormbound Vault', min: 4500, max: 7000, weight: 3.5 },
-  { id: 'sunkencrown', tier: 'legendaryRelics', name: 'The Sunken Crown', min: 25000, max: 40000, weight: 0.7 },
-  { id: 'godtideJewel', tier: 'legendaryRelics', name: 'The Godtide Jewel', min: 18000, max: 30000, weight: 1.2 }
+  { id: 'saltmossCoffer', tier: 'driftwoodFinds', name: 'Saltmoss Coffer', min: 500, max: 1500, weight: 30 },
+  { id: 'deadmanSatchel', tier: 'driftwoodFinds', name: "Deadman's Satchel", min: 800, max: 2000, weight: 25 },
+  { id: 'crewLockbox', tier: 'driftwoodFinds', name: 'Crewman Lockbox', min: 1000, max: 2500, weight: 22 },
+  { id: 'crimsonTrove', tier: 'captainsPlunder', name: 'Crimson Trove', min: 6000, max: 11000, weight: 11 },
+  { id: 'ironjawStrongbox', tier: 'captainsPlunder', name: 'Ironjaw Strongbox', min: 7000, max: 12000, weight: 10 },
+  { id: 'dreadcrownCasket', tier: 'warlordsVaults', name: 'Dreadcrown Casket', min: 50000, max: 80000, weight: 4 },
+  { id: 'stormboundVault', tier: 'warlordsVaults', name: 'Stormbound Vault', min: 45000, max: 70000, weight: 3.5 },
+  { id: 'sunkencrown', tier: 'legendaryRelics', name: 'The Sunken Crown', min: 250000, max: 400000, weight: 0.7 },
+  { id: 'godtideJewel', tier: 'legendaryRelics', name: 'The Godtide Jewel', min: 180000, max: 300000, weight: 1.2 }
 ];
 
 export const WEATHER_STATES = [
