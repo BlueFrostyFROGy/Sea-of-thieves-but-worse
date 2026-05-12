@@ -186,42 +186,49 @@ export class FleetScene extends Phaser.Scene {
     const ship = SHIP_CLASSES[shipKey];
     if (!ship) return;
 
-    // Draw simple ship silhouette
-    const shipGroup = this.add.group();
+    // Use same ship rendering as OceanScene but smaller scale
+    const shipScale = 1.0;
+    const shipContainer = this.add.container(x, y).setDepth(5);
 
     // Hull
-    const hull = this.add.ellipse(x, y, 50, 80, 0x2a5f7f);
-    hull.setStrokeStyle(2, 0x1a3d4d, 1);
-    shipGroup.add(hull);
+    const hull = this.add.rectangle(0, 0, 84 * shipScale * 0.4, 32 * shipScale * 0.4, 0x8a5b35);
+    
+    // Deck
+    const deck = this.add.rectangle(-8 * shipScale * 0.4, 0, 54 * shipScale * 0.4, 18 * shipScale * 0.4, 0x9a6a40);
+    
+    // Bow (pointy front)
+    const bow = this.add.triangle(44 * shipScale * 0.4, 0, 0, -16 * shipScale * 0.4, 30 * shipScale * 0.4, 0, 0, 16 * shipScale * 0.4, 0xbe8b5f);
+    
+    // Rails
+    const railTop = this.add.rectangle(0, -14 * shipScale * 0.4, 74 * shipScale * 0.4, 3 * shipScale * 0.4, 0x4f2f1d);
+    const railBottom = this.add.rectangle(0, 14 * shipScale * 0.4, 74 * shipScale * 0.4, 3 * shipScale * 0.4, 0x4f2f1d);
 
-    // Sail
-    const sail = this.add.triangle(x, y - 30, 0, -30, 0, 30, 35, 0, 0x9fc0d6);
-    sail.setStrokeStyle(1, 0x5c7a8a, 0.8);
-    shipGroup.add(sail);
+    shipContainer.add([hull, deck, bow, railTop, railBottom]);
 
     // Label with ship class and cargo
-    const label = this.add.text(x, y + 60, `${ship.label}\n(Cargo: ${ship.cargo})`, {
-      fontSize: '11px',
+    const label = this.add.text(x, y + 25, `${ship.label}\n(Cargo: ${ship.cargo})`, {
+      fontSize: '10px',
       color: '#eef8ff',
       align: 'center'
-    }).setOrigin(0.5);
-    shipGroup.add(label);
+    }).setOrigin(0.5).setDepth(5);
 
-    // Make interactive for hover effect
-    hull.setInteractive();
-    hull.on('pointerover', () => {
-      hull.setFillStyle(0x3a7f9f);
+    // Make interactive for click
+    const hitZone = this.add.rectangle(x, y, 50, 40, 0x000000, 0);
+    hitZone.setInteractive();
+    
+    hitZone.on('pointerover', () => {
+      hull.setFillStyle(0xaa7b55);
       label.setColor('#ffd700');
     });
-    hull.on('pointerout', () => {
+    hitZone.on('pointerout', () => {
       if (this.selectedShipIndex !== shipIndex) {
-        hull.setFillStyle(0x2a5f7f);
+        hull.setFillStyle(0x8a5b35);
         label.setColor('#eef8ff');
       }
     });
     
     // Click to select ship
-    hull.on('pointerdown', () => {
+    hitZone.on('pointerdown', () => {
       this.selectShip(shipIndex, shipKey, ship);
       hull.setFillStyle(0x4aaf2f);
       label.setColor('#ffd700');
