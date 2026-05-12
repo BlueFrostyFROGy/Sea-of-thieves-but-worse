@@ -22,59 +22,60 @@ export class FleetScene extends Phaser.Scene {
 
   create() {
     try {
-      // Set up world size for walking around
-      const worldWidth = 4200;
-      const worldHeight = 4200;
-      this.worldWidth = worldWidth;
-      this.worldHeight = worldHeight;
+      const shipSpacing = 340; // px between ship centers along each dock
+      const islandRadius = 220;
 
-      // Background
-      this.add.rectangle(worldWidth / 2, worldHeight / 2, worldWidth, worldHeight, 0x1a3d4d);
-      this.add.rectangle(worldWidth / 2, worldHeight / 2, worldWidth - 40, worldHeight - 40, 0x0f2834).setStrokeStyle(2, 0x2a7f62, 0.8);
+      // World size: big enough to hold all ships on the longest dock
+      const maxPerDock = Math.ceil(this.ownedShips.length / 4);
+      const pierLength = Math.max(700, maxPerDock * shipSpacing + 300);
+      const worldSize = Math.max(3200, (islandRadius + pierLength) * 2 + 600);
 
-      // Central base/building
-      const baseX = worldWidth / 2;
-      const baseY = worldHeight / 2;
-      const baseSize = 180;
-      
-      // Base structure
-      this.add.rectangle(baseX, baseY, baseSize, baseSize, 0x3d2817).setStrokeStyle(3, 0x5c4a2f, 1);
-      this.add.text(baseX, baseY - baseSize / 2 - 30, 'Fleet Base', { fontSize: '20px', color: '#ffe7b0', fontStyle: 'bold' }).setOrigin(0.5);
+      this.worldWidth = worldSize;
+      this.worldHeight = worldSize;
 
-      // Gold pile in base
-      this.createGoldPile(baseX, baseY);
+      const cx = worldSize / 2;
+      const cy = worldSize / 2;
 
-      // Create docks in 4 directions: North, South, East, West
-      const dockDistance = 1100;
+      // Background ocean
+      this.add.rectangle(cx, cy, worldSize, worldSize, 0x1a3d4d);
+      this.add.rectangle(cx, cy, worldSize - 40, worldSize - 40, 0x0f2834).setStrokeStyle(2, 0x2a7f62, 0.8);
+
+      // Central island — circle
+      this.add.circle(cx, cy, islandRadius + 10, 0x2a6e4a); // grass ring
+      this.add.circle(cx, cy, islandRadius, 0xc2a96e);       // sand
+      this.add.circle(cx, cy, islandRadius - 30, 0xb89658);  // inner sand
+
+      // Base building on island
+      this.add.rectangle(cx, cy, 110, 110, 0x3d2817).setStrokeStyle(3, 0x5c4a2f, 1);
+      this.add.text(cx, cy - islandRadius - 24, 'Fleet Base', { fontSize: '20px', color: '#ffe7b0', fontStyle: 'bold' }).setOrigin(0.5);
+
+      // Gold pile on island
+      this.createGoldPile(cx, cy);
+
+      // Distribute ships across 4 docks (round-robin)
       const dockBuckets = [[], [], [], []];
       this.ownedShips.forEach((shipKey, index) => {
         dockBuckets[index % 4].push({ shipKey, index });
       });
 
-      // North dock
-      this.createDock(baseX, baseY - dockDistance, 'north', dockBuckets[0]);
+      // Draw four straight piers + ships
+      this.createDock(cx, cy, islandRadius, 'north',  dockBuckets[0], pierLength, shipSpacing);
+      this.createDock(cx, cy, islandRadius, 'south',  dockBuckets[1], pierLength, shipSpacing);
+      this.createDock(cx, cy, islandRadius, 'east',   dockBuckets[2], pierLength, shipSpacing);
+      this.createDock(cx, cy, islandRadius, 'west',   dockBuckets[3], pierLength, shipSpacing);
 
-      // South dock
-      this.createDock(baseX, baseY + dockDistance, 'south', dockBuckets[1]);
-
-      // East dock
-      this.createDock(baseX + dockDistance, baseY, 'east', dockBuckets[2]);
-
-      // West dock
-      this.createDock(baseX - dockDistance, baseY, 'west', dockBuckets[3]);
-
-      // Player (walking avatar) - simple graphics object
-      this.player = this.add.rectangle(baseX, baseY + 100, 30, 40, 0x4a90e2);
-      this.playerX = baseX;
-      this.playerY = baseY + 100;
+      // Player avatar
+      this.player = this.add.rectangle(cx, cy + islandRadius + 30, 28, 38, 0x4a90e2).setDepth(10);
+      this.playerX = cx;
+      this.playerY = cy + islandRadius + 30;
       this.playerSpeed = 6;
 
-      // Camera follows player
+      // Camera
       this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-      this.cameras.main.setZoom(0.8);
-      this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
+      this.cameras.main.setZoom(0.75);
+      this.cameras.main.setBounds(0, 0, worldSize, worldSize);
 
-      // Input for movement
+      // Input
       this.cursors = this.input.keyboard.createCursorKeys();
       this.keys = {
         w: this.input.keyboard.addKey('W'),
@@ -83,24 +84,18 @@ export class FleetScene extends Phaser.Scene {
         d: this.input.keyboard.addKey('D')
       };
 
-      // UI Panel for selected ship (fixed to screen)
       this.createSelectionPanel();
 
-      // Escape to return to menu
       this.input.keyboard.on('keydown-ESC', () => {
-        console.log('ESC pressed, returning to menu');
         this.scene.start('MenuScene', { profile: this.profile });
       });
 
-      // Instructions
-      this.add.text(baseX, worldHeight - 40, 'Arrow keys or WASD to walk • Click a ship • ESC to return', { fontSize: '12px', color: '#6f8fa6' }).setOrigin(0.5);
+      this.add.text(cx, worldSize - 40, 'Arrow keys or WASD to walk  •  Click a ship  •  ESC to return', { fontSize: '12px', color: '#6f8fa6' }).setOrigin(0.5);
 
-      // Track selected ship
       this.selectedShipIndex = null;
       console.log('FleetScene created successfully');
     } catch (e) {
       console.error('FleetScene create error:', e);
-      // Fallback: return to menu
       this.scene.start('MenuScene');
     }
   }
@@ -169,68 +164,93 @@ export class FleetScene extends Phaser.Scene {
     }[shipKey] ?? 2.5;
   }
 
-  createDock(x, y, direction, shipsOnDock = []) {
-    const shipCount = shipsOnDock.length;
+  createDock(cx, cy, islandRadius, direction, shipsOnDock = [], pierLength = 700, shipSpacing = 340) {
+    const pierWidth = 72;
+    // How far from pier centreline ships are offset (so they don't sit ON the walkway)
+    const shipOffset = 210;
 
-    let dockX, dockY, isHorizontal;
+    // Pier start = island edge; pier extends outward
+    let pierX, pierY, pierW, pierH, labelX, labelY, labelAnchorY;
+
     if (direction === 'north') {
-      dockX = x;
-      dockY = y;
-      isHorizontal = true;
+      const pierTop = cy - islandRadius - pierLength;
+      pierX = cx;
+      pierY = pierTop + pierLength / 2;
+      pierW = pierWidth;
+      pierH = pierLength;
+      labelX = cx;
+      labelY = pierTop - 22;
+      labelAnchorY = 1;
     } else if (direction === 'south') {
-      dockX = x;
-      dockY = y;
-      isHorizontal = true;
+      const pierTop = cy + islandRadius;
+      pierX = cx;
+      pierY = pierTop + pierLength / 2;
+      pierW = pierWidth;
+      pierH = pierLength;
+      labelX = cx;
+      labelY = pierTop + pierLength + 22;
+      labelAnchorY = 0;
     } else if (direction === 'east') {
-      dockX = x;
-      dockY = y;
-      isHorizontal = false;
-    } else {
-      dockX = x;
-      dockY = y;
-      isHorizontal = false;
+      const pierLeft = cx + islandRadius;
+      pierX = pierLeft + pierLength / 2;
+      pierY = cy;
+      pierW = pierLength;
+      pierH = pierWidth;
+      labelX = pierLeft + pierLength + 22;
+      labelY = cy;
+      labelAnchorY = 0.5;
+    } else { // west
+      const pierRight = cx - islandRadius;
+      pierX = pierRight - pierLength / 2;
+      pierY = cy;
+      pierW = pierLength;
+      pierH = pierWidth;
+      labelX = pierRight - pierLength - 22;
+      labelY = cy;
+      labelAnchorY = 0.5;
     }
 
-    const gap = 80;
-    const spans = shipsOnDock.map(({ shipKey }) => {
-      const s = this.getShipVisualScale(shipKey);
-      const shipWidth = 84 * s;
-      const shipHeight = 32 * s;
-      return isHorizontal ? shipWidth + 120 : shipHeight + 120;
-    });
-
-    const contentLength = spans.length ? spans.reduce((a, b) => a + b, 0) + gap * (spans.length - 1) : 0;
-    const dockLength = Math.max(620, contentLength + 260);
-
-    // Draw dock platform
-    if (isHorizontal) {
-      this.add.rectangle(dockX, dockY, dockLength, 120, 0x5c4a2f).setStrokeStyle(2, 0x8b6f47, 0.8);
-    } else {
-      this.add.rectangle(dockX, dockY, 120, dockLength, 0x5c4a2f).setStrokeStyle(2, 0x8b6f47, 0.8);
+    // Draw pier plank
+    this.add.rectangle(pierX, pierY, pierW, pierH, 0x5c4a2f).setStrokeStyle(2, 0x8b6f47, 0.9);
+    // Plank lines for texture
+    if (pierW > pierH) { // horizontal pier
+      for (let lx = pierX - pierW / 2 + 60; lx < pierX + pierW / 2 - 20; lx += 60) {
+        this.add.rectangle(lx, pierY, 3, pierH - 8, 0x4a3820, 0.5);
+      }
+    } else { // vertical pier
+      for (let ly = pierY - pierH / 2 + 60; ly < pierY + pierH / 2 - 20; ly += 60) {
+        this.add.rectangle(pierX, ly, pierW - 8, 3, 0x4a3820, 0.5);
+      }
     }
 
-    // Dock label
-    this.add.text(dockX, dockY - (isHorizontal ? 78 : 88), `${direction.toUpperCase()} Dock`, {
-      fontSize: '14px',
-      color: '#ffe7b0'
-    }).setOrigin(0.5);
+    // Label
+    this.add.text(labelX, labelY, `${direction.toUpperCase()} DOCK`, {
+      fontSize: '14px', color: '#ffe7b0', fontStyle: 'bold'
+    }).setOrigin(0.5, labelAnchorY);
 
-    // Place ships on this dock
-    let cursor = -contentLength / 2;
+    if (shipsOnDock.length === 0) return;
+
+    // Distribute ships evenly along the pier, offset to one side
+    const total = shipsOnDock.length;
+    const usedLength = (total - 1) * shipSpacing;
+    const startOffset = -usedLength / 2;
+
     shipsOnDock.forEach(({ shipKey, index }, idx) => {
-      const span = spans[idx] ?? 240;
-      const centerOffset = cursor + span / 2;
+      const pos = startOffset + idx * shipSpacing;
       let shipX, shipY;
-      if (isHorizontal) {
-        shipX = dockX + centerOffset;
-        shipY = dockY;
+
+      if (direction === 'north' || direction === 'south') {
+        // Vertical pier – ships placed to the east side
+        shipX = cx + shipOffset;
+        // Map pos along the pier centre
+        shipY = pierY + pos;
       } else {
-        shipX = dockX;
-        shipY = dockY + centerOffset;
+        // Horizontal pier – ships placed to the south side
+        shipX = pierX + pos;
+        shipY = cy + shipOffset;
       }
 
       this.createShipSprite(shipX, shipY, shipKey, index);
-      cursor += span + gap;
     });
   }
 
