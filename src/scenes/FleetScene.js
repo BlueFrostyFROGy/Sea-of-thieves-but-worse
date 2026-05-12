@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SHIP_CLASSES } from '../data/gddData.js';
 import { saveProfile } from '../systems/ProfileSystem.js';
+import { submitScore } from '../systems/LeaderboardSystem.js';
 
 export class FleetScene extends Phaser.Scene {
   constructor() {
@@ -94,6 +95,9 @@ export class FleetScene extends Phaser.Scene {
 
       this.selectedShipIndex = null;
       console.log('FleetScene created successfully');
+
+      // Submit fleet power to global leaderboard (fire-and-forget)
+      submitScore(this.profile).catch(() => {});
     } catch (e) {
       console.error('FleetScene create error:', e);
       this.scene.start('MenuScene');

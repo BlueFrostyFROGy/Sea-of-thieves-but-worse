@@ -38,9 +38,10 @@ export class MenuScene extends Phaser.Scene {
     this.add.text(width / 2, 110, 'Choose your voyage, expand your fleet, and buy new ships.', { fontSize: '15px', color: '#79b8e8' }).setOrigin(0.5);
 
     this.tabButtons = [
-      this.createTabButton(width / 2 - 185, 168, 'Voyage Setup', 'sail'),
-      this.createTabButton(width / 2, 168, 'Ship Shop', 'shop'),
-      this.createTabButton(width / 2 + 185, 168, 'My Ships', 'fleet')
+      this.createTabButton(width / 2 - 275, 168, 'Voyage Setup', 'sail'),
+      this.createTabButton(width / 2 - 92,  168, 'Ship Shop', 'shop'),
+      this.createTabButton(width / 2 + 92,  168, 'My Fleet', 'fleet'),
+      this.createTabButton(width / 2 + 275, 168, '🏆 Leaderboard', 'leaderboard')
     ];
 
     this.mainPanel = this.add.rectangle(width / 2, height / 2 + 20, 860, 344, 0x071723, 0.9).setStrokeStyle(2, 0x31526d, 0.9);
@@ -66,9 +67,10 @@ export class MenuScene extends Phaser.Scene {
     this.lobbyButtons.start.setVisible(false);
     this.lobbyCodeText = this.add.text(width / 2 + 248, height / 2 + 198, '', { fontSize: '18px', color: '#9ef0ff', fontStyle: 'bold' }).setOrigin(0, 0);
 
-    this.input.keyboard.on('keydown-ONE', () => this.setViewMode('sail'));
-    this.input.keyboard.on('keydown-TWO', () => this.setViewMode('shop'));
+    this.input.keyboard.on('keydown-ONE',   () => this.setViewMode('sail'));
+    this.input.keyboard.on('keydown-TWO',   () => this.setViewMode('shop'));
     this.input.keyboard.on('keydown-THREE', () => this.setViewMode('fleet'));
+    this.input.keyboard.on('keydown-FOUR',  () => this.setViewMode('leaderboard'));
     this.input.keyboard.on('keydown-LEFT', () => this.cycleShip(-1));
     this.input.keyboard.on('keydown-RIGHT', () => this.cycleShip(1));
     this.input.keyboard.on('keydown-UP', () => this.cycleFaction(-1));
@@ -146,6 +148,10 @@ export class MenuScene extends Phaser.Scene {
       } catch (e) {
         console.error('Failed to start FleetScene:', e);
       }
+      return;
+    }
+    if (mode === 'leaderboard') {
+      this.scene.start('LeaderboardScene', { profile: this.profile });
       return;
     }
     this.viewMode = mode;

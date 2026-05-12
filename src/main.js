@@ -3,6 +3,7 @@ import { BootScene } from './scenes/BootScene.js';
 import { MenuScene } from './scenes/MenuScene.js';
 import { OceanScene } from './scenes/OceanScene.js';
 import { FleetScene } from './scenes/FleetScene.js';
+import { LeaderboardScene } from './scenes/LeaderboardScene.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -10,7 +11,7 @@ const config = {
   width: window.innerWidth,
   height: window.innerHeight,
   backgroundColor: '#07131f',
-  scene: [BootScene, MenuScene, OceanScene, FleetScene],
+  scene: [BootScene, MenuScene, OceanScene, FleetScene, LeaderboardScene],
   render: {
     antialias: true,
     pixelArt: false
