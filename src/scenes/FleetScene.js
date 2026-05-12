@@ -4,7 +4,16 @@ import { saveProfile } from '../systems/ProfileSystem.js';
 
 export class FleetScene extends Phaser.Scene {
   constructor() {
-    super('FleetScene');
+    super({
+      key: 'FleetScene',
+      physics: {
+        default: 'arcade',
+        arcade: {
+          gravity: { y: 0 },
+          debug: false
+        }
+      }
+    });
   }
 
   init(data) {
