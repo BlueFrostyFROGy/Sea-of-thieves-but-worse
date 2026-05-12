@@ -410,6 +410,7 @@ export class OceanScene extends Phaser.Scene {
       sprint: 'SHIFT',
       interact: 'E',
       loot: 'F',
+      sell: 'COMMA',
       fire: 'SPACE',
       jump: 'SPACE',
       melee: 'J',
@@ -1668,7 +1669,7 @@ export class OceanScene extends Phaser.Scene {
       // fall through to outpost sell check below
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.keys.interact) && nearestOutpost) {
+    if (Phaser.Input.Keyboard.JustDown(this.keys.sell) && nearestOutpost) {
       const npc = nearestOutpost.outpostNpc;
       const npcDist = npc ? Phaser.Math.Distance.Between(this.playerPawn.x, this.playerPawn.y, npc.x, npc.y) : Infinity;
       if (!this.onFoot) {
