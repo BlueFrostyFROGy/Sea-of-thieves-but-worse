@@ -23,8 +23,10 @@ export class FleetScene extends Phaser.Scene {
   create() {
     try {
       // Set up world size for walking around
-      const worldWidth = 2400;
-      const worldHeight = 2400;
+      const worldWidth = 4200;
+      const worldHeight = 4200;
+      this.worldWidth = worldWidth;
+      this.worldHeight = worldHeight;
 
       // Background
       this.add.rectangle(worldWidth / 2, worldHeight / 2, worldWidth, worldHeight, 0x1a3d4d);
@@ -43,25 +45,29 @@ export class FleetScene extends Phaser.Scene {
       this.createGoldPile(baseX, baseY);
 
       // Create docks in 4 directions: North, South, East, West
-      const dockDistance = 400;
-      
+      const dockDistance = 1100;
+      const dockBuckets = [[], [], [], []];
+      this.ownedShips.forEach((shipKey, index) => {
+        dockBuckets[index % 4].push({ shipKey, index });
+      });
+
       // North dock
-      this.createDock(baseX, baseY - dockDistance, 'north', 0);
-      
+      this.createDock(baseX, baseY - dockDistance, 'north', dockBuckets[0]);
+
       // South dock
-      this.createDock(baseX, baseY + dockDistance, 'south', 2);
-      
+      this.createDock(baseX, baseY + dockDistance, 'south', dockBuckets[1]);
+
       // East dock
-      this.createDock(baseX + dockDistance, baseY, 'east', 1);
-      
+      this.createDock(baseX + dockDistance, baseY, 'east', dockBuckets[2]);
+
       // West dock
-      this.createDock(baseX - dockDistance, baseY, 'west', 3);
+      this.createDock(baseX - dockDistance, baseY, 'west', dockBuckets[3]);
 
       // Player (walking avatar) - simple graphics object
       this.player = this.add.rectangle(baseX, baseY + 100, 30, 40, 0x4a90e2);
       this.playerX = baseX;
       this.playerY = baseY + 100;
-      this.playerSpeed = 4;
+      this.playerSpeed = 6;
 
       // Camera follows player
       this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
@@ -106,12 +112,18 @@ export class FleetScene extends Phaser.Scene {
     const scaleRatio = Math.max(0.3, Math.min(1, goldAmount / maxGold));
     const pileSize = 60 * scaleRatio;
 
+    // Glow halos
+    const haloOuter = this.add.circle(x, y, pileSize * 1.9, 0xffd45a, 0.22).setBlendMode(Phaser.BlendModes.ADD);
+    const haloInner = this.add.circle(x, y, pileSize * 1.2, 0xfff1a6, 0.28).setBlendMode(Phaser.BlendModes.ADD);
+
     // Draw multiple circles to create a pile effect
     const colors = [0xffd700, 0xffa500, 0xffed4e];
+    const coins = [];
     for (let i = 0; i < 3; i++) {
       const offsetY = (i - 1) * (pileSize / 2);
       const circle = this.add.circle(x, y + offsetY, pileSize - i * 8, colors[i]);
       circle.setStrokeStyle(1, 0x8b6f47, 0.6);
+      coins.push(circle);
     }
 
     // Gold text display
@@ -124,16 +136,41 @@ export class FleetScene extends Phaser.Scene {
     // Pulsing tween for gold
     this.tweens.add({
       targets: goldText,
-      scale: { from: 1, to: 1.1 },
+      scale: { from: 1, to: 1.2 },
       duration: 1500,
       yoyo: true,
       repeat: -1
     });
+
+    this.tweens.add({
+      targets: [haloOuter, haloInner],
+      alpha: { from: 0.18, to: 0.42 },
+      scale: { from: 1, to: 1.12 },
+      duration: 900,
+      yoyo: true,
+      repeat: -1
+    });
+
+    this.tweens.add({
+      targets: coins,
+      duration: 700,
+      yoyo: true,
+      repeat: -1,
+      alpha: { from: 0.88, to: 1 }
+    });
   }
 
-  createDock(x, y, direction, dockIndex) {
-    const shipCount = this.ownedShips.length;
-    const dockLength = 100 + (shipCount - 1) * 120;
+  getShipVisualScale(shipKey) {
+    return {
+      skiff: 2.5,
+      brigantine: 3.2,
+      galleon: 4.0,
+      warship: 4.8
+    }[shipKey] ?? 2.5;
+  }
+
+  createDock(x, y, direction, shipsOnDock = []) {
+    const shipCount = shipsOnDock.length;
 
     let dockX, dockY, isHorizontal;
     if (direction === 'north') {
@@ -154,31 +191,46 @@ export class FleetScene extends Phaser.Scene {
       isHorizontal = false;
     }
 
+    const gap = 80;
+    const spans = shipsOnDock.map(({ shipKey }) => {
+      const s = this.getShipVisualScale(shipKey);
+      const shipWidth = 84 * s;
+      const shipHeight = 32 * s;
+      return isHorizontal ? shipWidth + 120 : shipHeight + 120;
+    });
+
+    const contentLength = spans.length ? spans.reduce((a, b) => a + b, 0) + gap * (spans.length - 1) : 0;
+    const dockLength = Math.max(620, contentLength + 260);
+
     // Draw dock platform
     if (isHorizontal) {
-      this.add.rectangle(dockX, dockY, dockLength, 60, 0x5c4a2f).setStrokeStyle(2, 0x8b6f47, 0.8);
+      this.add.rectangle(dockX, dockY, dockLength, 120, 0x5c4a2f).setStrokeStyle(2, 0x8b6f47, 0.8);
     } else {
-      this.add.rectangle(dockX, dockY, 60, dockLength, 0x5c4a2f).setStrokeStyle(2, 0x8b6f47, 0.8);
+      this.add.rectangle(dockX, dockY, 120, dockLength, 0x5c4a2f).setStrokeStyle(2, 0x8b6f47, 0.8);
     }
 
     // Dock label
-    this.add.text(dockX, dockY - (isHorizontal ? 45 : 65), `${direction.toUpperCase()} Dock`, {
+    this.add.text(dockX, dockY - (isHorizontal ? 78 : 88), `${direction.toUpperCase()} Dock`, {
       fontSize: '14px',
       color: '#ffe7b0'
     }).setOrigin(0.5);
 
     // Place ships on this dock
-    this.ownedShips.forEach((shipKey, idx) => {
+    let cursor = -contentLength / 2;
+    shipsOnDock.forEach(({ shipKey, index }, idx) => {
+      const span = spans[idx] ?? 240;
+      const centerOffset = cursor + span / 2;
       let shipX, shipY;
       if (isHorizontal) {
-        shipX = dockX - (dockLength / 2 - 70) + idx * 120;
+        shipX = dockX + centerOffset;
         shipY = dockY;
       } else {
         shipX = dockX;
-        shipY = dockY - (dockLength / 2 - 70) + idx * 120;
+        shipY = dockY + centerOffset;
       }
 
-      this.createShipSprite(shipX, shipY, shipKey, idx);
+      this.createShipSprite(shipX, shipY, shipKey, index);
+      cursor += span + gap;
     });
   }
 
@@ -187,12 +239,7 @@ export class FleetScene extends Phaser.Scene {
     if (!ship) return;
 
     // Use same ship scaling as OceanScene
-    const shipVisualScale = {
-      skiff: 2.5,
-      brigantine: 3.2,
-      galleon: 4.0,
-      warship: 4.8
-    }[shipKey] ?? 2.5;
+    const shipVisualScale = this.getShipVisualScale(shipKey);
 
     const shipContainer = this.add.container(x, y).setDepth(5);
 
@@ -341,8 +388,8 @@ export class FleetScene extends Phaser.Scene {
 
   update() {
     // Simple player movement without physics
-    const worldWidth = 2400;
-    const worldHeight = 2400;
+    const worldWidth = this.worldWidth ?? 4200;
+    const worldHeight = this.worldHeight ?? 4200;
     const minX = 50;
     const maxX = worldWidth - 50;
     const minY = 50;
