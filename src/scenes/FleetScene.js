@@ -186,34 +186,40 @@ export class FleetScene extends Phaser.Scene {
     const ship = SHIP_CLASSES[shipKey];
     if (!ship) return;
 
-    // Use same ship rendering as OceanScene but smaller scale
-    const shipScale = 1.0;
+    // Use same ship scaling as OceanScene
+    const shipVisualScale = {
+      skiff: 2.5,
+      brigantine: 3.2,
+      galleon: 4.0,
+      warship: 4.8
+    }[shipKey] ?? 2.5;
+
     const shipContainer = this.add.container(x, y).setDepth(5);
 
     // Hull
-    const hull = this.add.rectangle(0, 0, 84 * shipScale * 0.4, 32 * shipScale * 0.4, 0x8a5b35);
+    const hull = this.add.rectangle(0, 0, 84 * shipVisualScale, 32 * shipVisualScale, 0x8a5b35);
     
     // Deck
-    const deck = this.add.rectangle(-8 * shipScale * 0.4, 0, 54 * shipScale * 0.4, 18 * shipScale * 0.4, 0x9a6a40);
+    const deck = this.add.rectangle(-8 * shipVisualScale, 0, 54 * shipVisualScale, 18 * shipVisualScale, 0x9a6a40);
     
     // Bow (pointy front)
-    const bow = this.add.triangle(44 * shipScale * 0.4, 0, 0, -16 * shipScale * 0.4, 30 * shipScale * 0.4, 0, 0, 16 * shipScale * 0.4, 0xbe8b5f);
+    const bow = this.add.triangle(44 * shipVisualScale, 0, 0, -16 * shipVisualScale, 30 * shipVisualScale, 0, 0, 16 * shipVisualScale, 0xbe8b5f);
     
     // Rails
-    const railTop = this.add.rectangle(0, -14 * shipScale * 0.4, 74 * shipScale * 0.4, 3 * shipScale * 0.4, 0x4f2f1d);
-    const railBottom = this.add.rectangle(0, 14 * shipScale * 0.4, 74 * shipScale * 0.4, 3 * shipScale * 0.4, 0x4f2f1d);
+    const railTop = this.add.rectangle(0, -14 * shipVisualScale, 74 * shipVisualScale, 3 * shipVisualScale, 0x4f2f1d);
+    const railBottom = this.add.rectangle(0, 14 * shipVisualScale, 74 * shipVisualScale, 3 * shipVisualScale, 0x4f2f1d);
 
     shipContainer.add([hull, deck, bow, railTop, railBottom]);
 
     // Label with ship class and cargo
-    const label = this.add.text(x, y + 25, `${ship.label}\n(Cargo: ${ship.cargo})`, {
-      fontSize: '10px',
+    const label = this.add.text(x, y + 50 * shipVisualScale, `${ship.label}\n(Cargo: ${ship.cargo})`, {
+      fontSize: '12px',
       color: '#eef8ff',
       align: 'center'
     }).setOrigin(0.5).setDepth(5);
 
     // Make interactive for click
-    const hitZone = this.add.rectangle(x, y, 50, 40, 0x000000, 0);
+    const hitZone = this.add.rectangle(x, y, 100 * shipVisualScale, 80 * shipVisualScale, 0x000000, 0);
     hitZone.setInteractive();
     
     hitZone.on('pointerover', () => {
@@ -255,16 +261,20 @@ export class FleetScene extends Phaser.Scene {
       bg: panelBg,
       title: this.add.text(20 + 140, height - 150, 'Click a ship', { fontSize: '14px', color: '#ffe7b0', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0, 0).setDepth(101),
       stats: this.add.text(20 + 140, height - 110, '', { fontSize: '12px', color: '#eef8ff' }).setOrigin(0.5).setScrollFactor(0, 0).setDepth(101),
+      buySkiffText: this.add.text(20 + 140, height - 85, `Buy Extra Skiff: ${SHIP_CLASSES.skiff.cost}g`, { fontSize: '11px', color: '#ffd700', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0, 0).setDepth(101),
       buttons: {
-        sail: this.createFixedButton(20 + 60, height - 55, 110, 30, 'SET SAIL', () => {
+        sail: this.createFixedButton(20 + 20, height - 55, 80, 30, 'SET SAIL', () => {
           if (this.selectedShipKey !== undefined) {
             this.sailShip();
           }
         }).setScrollFactor(0, 0).setDepth(101),
-        flagship: this.createFixedButton(20 + 220, height - 55, 110, 30, 'SET FLAGSHIP', () => {
+        flagship: this.createFixedButton(20 + 105, height - 55, 80, 30, 'FLAGSHIP', () => {
           if (this.selectedShipKey !== undefined) {
             this.setFlagship();
           }
+        }).setScrollFactor(0, 0).setDepth(101),
+        buySkiff: this.createFixedButton(20 + 190, height - 55, 90, 30, 'BUY SKIFF', () => {
+          this.buyExtraSkiff();
         }).setScrollFactor(0, 0).setDepth(101)
       }
     };
@@ -307,6 +317,20 @@ export class FleetScene extends Phaser.Scene {
     this.profile.flagshipShip = this.selectedShipKey;
     saveProfile(this.profile);
     this.selectionPanel.title.setText(`${SHIP_CLASSES[this.selectedShipKey].label} (Flagship)`);
+  }
+
+  buyExtraSkiff() {
+    const skiffCost = SHIP_CLASSES.skiff.cost;
+    if (this.profile.gold < skiffCost) {
+      this.selectionPanel.title.setText(`Need ${skiffCost}g to buy a skiff!`);
+      return;
+    }
+    this.profile.gold -= skiffCost;
+    this.profile.ownedShips = [...(this.profile.ownedShips ?? []), 'skiff'];
+    saveProfile(this.profile);
+    this.selectionPanel.title.setText('Skiff Purchased!');
+    // Reload scene to show new ship
+    setTimeout(() => this.scene.restart(), 1000);
   }
 
   formatGold(amount) {
