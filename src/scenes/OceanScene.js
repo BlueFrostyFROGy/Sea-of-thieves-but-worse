@@ -1669,7 +1669,22 @@ export class OceanScene extends Phaser.Scene {
       // fall through to outpost sell check below
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.keys.sell) && nearestOutpost) {
+    const sellPressed = Phaser.Input.Keyboard.JustDown(this.keys.sell);
+
+    if (this.onFoot && Phaser.Input.Keyboard.JustDown(this.keys.interact) && nearestOutpost) {
+      const npc = nearestOutpost.outpostNpc;
+      const npcDist = npc ? Phaser.Math.Distance.Between(this.playerPawn.x, this.playerPawn.y, npc.x, npc.y) : Infinity;
+      if (npcDist <= 68) {
+        this.pushToast('Press [,] to sell loot to the merchant.');
+        return;
+      }
+    }
+
+    if (sellPressed) {
+      if (!nearestOutpost) {
+        this.pushToast('Visit an outpost to sell your loot.');
+        return;
+      }
       const npc = nearestOutpost.outpostNpc;
       if (!npc) {
         this.pushToast('NPC not found at outpost.');
@@ -1796,7 +1811,7 @@ export class OceanScene extends Phaser.Scene {
 
     this.hudText.setText([
       `${SHIP_CLASSES[this.shipType].label} | ${mode} | Zone: ${zone.name} | Speed ${speed} | Hull ${Math.floor(this.state.ship.hull)} | Cargo ${this.state.cargo.length} | Gold ${this.state.gold}${fortKeyHint}`,
-      `HP ${Math.floor(player.hp)}  Stamina ${Math.floor(player.stamina)}  Breath ${player.isDiving ? `${player.breath.toFixed(1)}s` : 'Surface'} | Carrying: ${carrying} | [G] deck/island [SPACE] jump [F] pick up / fort flag / ship cargo [E] store / sell [J] sword`
+      `HP ${Math.floor(player.hp)}  Stamina ${Math.floor(player.stamina)}  Breath ${player.isDiving ? `${player.breath.toFixed(1)}s` : 'Surface'} | Carrying: ${carrying} | [G] deck/island [SPACE] jump [F] pick up / fort flag / ship cargo [E] interact/store [,] sell [J] sword`
     ]);
 
     if (this.toastTimer > 0) {
