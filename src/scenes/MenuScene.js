@@ -375,10 +375,12 @@ export class MenuScene extends Phaser.Scene {
       this.pageBody.setText(this.shipKeys.map((key, index) => {
         const data = this.getShipState(key);
         const selected = key === shipKey ? '▶ ' : '  ';
-        return `${selected}${index + 1}. ${data.ship.label} — Price ${data.ship.cost}g — ${data.owned ? 'Owned' : data.status} — Hull ${data.ship.hp}, Cannons ${data.ship.cannons}, Cargo ${data.ship.cargo}`;
+        const count = this.profile.ownedShips.filter(k => k === key).length;
+        const ownedText = count > 0 ? `Owned (×${count})` : data.status;
+        return `${selected}${index + 1}. ${data.ship.label} — Price ${data.ship.cost}g — ${ownedText} — Hull ${data.ship.hp}, Cannons ${data.ship.cannons}, Cargo ${data.ship.cargo}`;
       }).join('\n'));
       this.pageMeta.setText(`Gold ${this.profile.gold}  •  Selected ${ship.label} costs ${ship.cost}g  •  ${status}`);
-      this.pageHint.setText('Click the Ship Shop tab any time, or use [2]. Use Left/Right to browse ships and [B] to buy the selected ship.');
+      this.pageHint.setText('Click the Ship Shop tab any time, or use [2]. Use Left/Right to browse ships and [B] to buy the selected ship. You can own multiple of the same ship!');
     } else {
       const fleetLines = this.profile.ownedShips.map((key, index) => {
         const selected = key === shipKey ? '▶ ' : '  ';
@@ -399,14 +401,13 @@ export class MenuScene extends Phaser.Scene {
   buySelectedShip() {
     this.setViewMode('shop');
     const shipKey = this.shipKeys[this.shipIndex];
-    const { ship, owned, previousOwned } = this.getShipState(shipKey);
+    const { ship, previousOwned } = this.getShipState(shipKey);
 
-    if (owned) return this.setStatusMessage(`${ship.label} already owned.`);
     if (!previousOwned) return this.setStatusMessage('Buy the previous ship first.');
     if (this.profile.gold < ship.cost) return this.setStatusMessage(`Not enough gold. Need ${ship.cost}g.`);
 
     this.profile.gold -= ship.cost;
-    this.profile.ownedShips = Array.from(new Set([...(this.profile.ownedShips ?? []), shipKey]));
+    this.profile.ownedShips = [...(this.profile.ownedShips ?? []), shipKey];
     if (!this.profile.flagshipShip) this.profile.flagshipShip = shipKey;
     saveProfile(this.profile);
     this.refreshLabels();
