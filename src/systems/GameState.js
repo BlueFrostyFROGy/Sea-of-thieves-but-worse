@@ -323,8 +323,11 @@ export class GameState {
     }
   }
 
-  rollTreasure(zoneDanger = 1) {
-    const item = weightedChoice(TREASURE_TABLE, this.rng);
+  rollTreasure(zoneDanger = 1, forcedTier = null) {
+    const table = forcedTier
+      ? TREASURE_TABLE.filter((t) => t.tier === forcedTier)
+      : TREASURE_TABLE;
+    const item = weightedChoice(table.length ? table : TREASURE_TABLE, this.rng);
     const rawValue = Phaser.Math.Between(item.min, item.max);
     const zoneMultiplier = 1 + zoneDanger * 0.18;
     return {
@@ -333,6 +336,31 @@ export class GameState {
       name: item.name,
       baseValue: Math.floor(rawValue * zoneMultiplier),
       discoveredAt: Date.now()
+    };
+  }
+
+  replenishSupplies() {
+    const maxFood = { banana: 12, fish: 8, rum: 6 };
+    const gainFood = { banana: 3, fish: 2, rum: 1 };
+
+    let foodGained = 0;
+    for (const key of Object.keys(maxFood)) {
+      const before = this.player.food[key] ?? 0;
+      const after = Math.min(maxFood[key], before + gainFood[key]);
+      this.player.food[key] = after;
+      foodGained += Math.max(0, after - before);
+    }
+
+    this.player.hp = Math.min(this.player.maxHp, this.player.hp + 20);
+    this.ship.hull = Math.min(this.ship.maxHull, this.ship.hull + 120);
+    this.ship.water = Math.max(0, this.ship.water - 14);
+    for (const key of Object.keys(this.ship.components)) {
+      this.ship.components[key] = Math.min(100, this.ship.components[key] + 8);
+    }
+
+    return {
+      foodGained,
+      reason: `Barrel looted: +${foodGained} food, ship patched, and supplies restocked.`
     };
   }
 

@@ -155,8 +155,67 @@ export class OceanScene extends Phaser.Scene {
     }
   }
 
+  resolveLootTierForSource(sourceType) {
+    if (sourceType === 'bossVault') {
+      return Phaser.Math.FloatBetween(0, 1) < 0.45 ? 'legendaryRelics' : 'warlordsVaults';
+    }
+    if (sourceType === 'seafortVault' || sourceType === 'skullfort') {
+      return Phaser.Math.FloatBetween(0, 1) < 0.18 ? 'legendaryRelics' : 'warlordsVaults';
+    }
+    if (sourceType === 'ghost') return Phaser.Math.FloatBetween(0, 1) < 0.35 ? 'warlordsVaults' : 'captainsPlunder';
+    if (sourceType === 'shipwreck') return Phaser.Math.FloatBetween(0, 1) < 0.2 ? 'warlordsVaults' : 'captainsPlunder';
+    if (sourceType === 'treasure') return Phaser.Math.FloatBetween(0, 1) < 0.55 ? 'captainsPlunder' : 'driftwoodFinds';
+    return 'driftwoodFinds';
+  }
+
+  createLootNodeAt(x, y, { zone, sourceType, islandId, requiresDive = false, valueMult = 1, tier = null } = {}) {
+    const resolvedTier = tier ?? this.resolveLootTierForSource(sourceType);
+    const style = this.getLootTierStyle(resolvedTier);
+    const chestBase = this.add.rectangle(x, y + 5, 20, 12, style.base).setDepth(7);
+    const chestLid = this.add.rectangle(x, y - 1, 20, 7, style.lid).setDepth(8);
+    const chestLock = this.add.rectangle(x, y + 2, 5, 5, style.lock).setDepth(8.2);
+    const chestSparkle = this.add.circle(x + 11, y - 9, 3, 0xffe8a8, 0.85).setDepth(9);
+    const sprites = [chestBase, chestLid, chestSparkle, chestLock];
+
+    if (resolvedTier === 'legendaryRelics') {
+      const aura = this.add.circle(x, y - 1, 16, style.glow ?? 0xb46dff, 0.34).setDepth(6.9);
+      this.tweens.add({ targets: aura, alpha: { from: 0.18, to: 0.52 }, yoyo: true, repeat: -1, duration: 900 });
+      sprites.push(aura);
+    }
+
+    const node = {
+      x,
+      y,
+      taken: false,
+      zone,
+      sourceType,
+      islandId,
+      requiresDive,
+      valueMult,
+      treasureTier: resolvedTier,
+      sprites
+    };
+    this.lootNodes.push(node);
+    return node;
+  }
+
+  findNearestSupplyBarrel(maxDist, fromX = this.playerPawn.x, fromY = this.playerPawn.y) {
+    let nearest = null;
+    let best = maxDist;
+    for (const barrel of this.supplyBarrels ?? []) {
+      if (!barrel || barrel.used) continue;
+      const d = Phaser.Math.Distance.Between(fromX, fromY, barrel.x, barrel.y);
+      if (d < best) {
+        best = d;
+        nearest = barrel;
+      }
+    }
+    return nearest;
+  }
+
   createIslandDetails() {
     this.lootNodes = [];
+    this.supplyBarrels = [];
     this.seafortStates = new Map();
 
     for (const island of this.world.islands) {
@@ -198,6 +257,22 @@ export class OceanScene extends Phaser.Scene {
         island.vegetation.push(trunk, leaves);
       }
 
+      // --- Supply barrels ---
+      const barrelCount = island.type === 'outpost' ? 3 : Phaser.Math.Between(1, 2);
+      for (let b = 0; b < barrelCount; b++) {
+        const ba = Phaser.Math.FloatBetween(0, Math.PI * 2);
+        const bd = Phaser.Math.Between(Math.floor(island.radius * 0.2), Math.max(20, Math.floor(island.radius * 0.72)));
+        const bx = island.x + Math.cos(ba) * bd;
+        const by = island.y + Math.sin(ba) * bd;
+        const barrelBody = this.add.circle(bx, by + 1, 7, 0x6a3c24).setDepth(7);
+        const barrelBand1 = this.add.rectangle(bx, by - 3, 12, 2, 0x2a2a2a).setDepth(7.1);
+        const barrelBand2 = this.add.rectangle(bx, by + 4, 12, 2, 0x2a2a2a).setDepth(7.1);
+        const barrelTop = this.add.circle(bx, by - 6, 6, 0x84502f).setDepth(7.15);
+        const barrel = { x: bx, y: by, islandId: island.id, used: false, sprites: [barrelBody, barrelBand1, barrelBand2, barrelTop] };
+        this.supplyBarrels.push(barrel);
+        island.buildings.push(...barrel.sprites);
+      }
+
       // --- Outpost: npc seller + flag + pier ---
       if (island.type === 'outpost') {
         const px = island.x + Phaser.Math.Between(-20, 20);
@@ -223,21 +298,12 @@ export class OceanScene extends Phaser.Scene {
         const chestDist = Phaser.Math.Between(Math.floor(island.radius * 0.2), Math.max(24, Math.floor(island.radius * 0.55)));
         const chestX = island.x + Math.cos(chestAngle) * chestDist;
         const chestY = island.y + Math.sin(chestAngle) * chestDist;
-        const chestBase = this.add.rectangle(chestX, chestY + 5, 20, 12, 0x5d351f).setDepth(7);
-        const chestLid = this.add.rectangle(chestX, chestY - 1, 20, 7, 0xc9963f).setDepth(8);
-        const chestLock = this.add.rectangle(chestX, chestY + 2, 5, 5, 0xdeb359).setDepth(8.2);
-        const chestSparkle = this.add.circle(chestX + 11, chestY - 9, 3, 0xffe8a8, 0.85).setDepth(9);
-        island.lootNode = {
-          x: chestX,
-          y: chestY,
-          taken: false,
+        island.lootNode = this.createLootNodeAt(chestX, chestY, {
           zone: island.zone,
           sourceType: island.type,
           islandId: island.id,
-          requiresDive: false,
-          sprites: [chestBase, chestLid, chestSparkle, chestLock]
-        };
-        this.lootNodes.push(island.lootNode);
+          requiresDive: false
+        });
 
         island.outpostNpc = { x: island.x, y: island.y, sprite: npcBody };
         island.buildings.push(pole, flag, poleBase, sign, signText, npcBase, npcBody, npcHead, npcHat, npcDialog, pier1);
@@ -286,12 +352,12 @@ export class OceanScene extends Phaser.Scene {
       const ld = Phaser.Math.Between(Math.floor(island.radius * 0.2), Math.max(20, island.radius - 22));
       const lx = island.x + Math.cos(la) * ld;
       const ly = island.y + Math.sin(la) * ld;
-      const chestBase = this.add.rectangle(lx, ly + 5, 20, 12, 0x5d351f).setDepth(7);
-      const chestLid = this.add.rectangle(lx, ly - 1, 20, 7, 0xc9963f).setDepth(8);
-      const chestLock = this.add.rectangle(lx, ly + 2, 5, 5, 0xdeb359).setDepth(8.2);
-      const sparkle = this.add.circle(lx + 11, ly - 9, 3, 0xffe8a8, 0.85).setDepth(9);
-      island.lootNode = { x: lx, y: ly, taken: false, zone: island.zone, sourceType: island.type, islandId: island.id, requiresDive: island.type === 'shipwreck', sprites: [chestBase, chestLid, sparkle, chestLock] };
-      this.lootNodes.push(island.lootNode);
+      island.lootNode = this.createLootNodeAt(lx, ly, {
+        zone: island.zone,
+        sourceType: island.type,
+        islandId: island.id,
+        requiresDive: island.type === 'shipwreck'
+      });
     }
   }
 
@@ -462,15 +528,33 @@ export class OceanScene extends Phaser.Scene {
     this.carriedLoot = null;
     this.carriedLootSprite = null;
     this.shipCargoSprites = [];
+    this.shipCargoOverflowLabel = null;
     this.fortKey = null;
   }
 
-  createLootCrateSprite(x, y, depth = 11) {
+  getLootTierStyle(tier = 'driftwoodFinds') {
+    const palette = {
+      driftwoodFinds: { base: 0x6b4a2a, lid: 0xb68749, lock: 0xd9ba6b, glow: null },
+      captainsPlunder: { base: 0x5d2e1f, lid: 0xd08b3f, lock: 0xf0c06b, glow: 0xffd089 },
+      warlordsVaults: { base: 0x3f2a62, lid: 0x7f66c4, lock: 0xd7ccff, glow: 0xa18dff },
+      legendaryRelics: { base: 0x2e1b4f, lid: 0xae7dff, lock: 0xffeaa8, glow: 0xb46dff }
+    };
+    return palette[tier] ?? palette.driftwoodFinds;
+  }
+
+  createLootCrateSprite(x, y, depth = 11, tier = 'driftwoodFinds') {
+    const style = this.getLootTierStyle(tier);
     const crate = this.add.container(x, y).setDepth(depth);
-    const base = this.add.rectangle(0, 4, 16, 10, 0x5d351f);
-    const lid = this.add.rectangle(0, -1, 16, 6, 0xc9963f);
-    const lock = this.add.rectangle(0, 2, 4, 4, 0xdeb359);
-    crate.add([base, lid, lock]);
+    const base = this.add.rectangle(0, 4, 16, 10, style.base);
+    const lid = this.add.rectangle(0, -1, 16, 6, style.lid);
+    const lock = this.add.rectangle(0, 2, 4, 4, style.lock);
+    const nodes = [base, lid, lock];
+    if (tier === 'legendaryRelics') {
+      const aura = this.add.circle(0, -2, 14, style.glow ?? 0xb46dff, 0.33);
+      this.tweens.add({ targets: aura, alpha: { from: 0.2, to: 0.55 }, yoyo: true, repeat: -1, duration: 800 });
+      nodes.unshift(aura);
+    }
+    crate.add(nodes);
     return crate;
   }
 
@@ -484,7 +568,7 @@ export class OceanScene extends Phaser.Scene {
     }
 
     if (!this.carriedLootSprite) {
-      this.carriedLootSprite = this.createLootCrateSprite(this.playerPawn.x, this.playerPawn.y - 18, 24);
+      this.carriedLootSprite = this.createLootCrateSprite(this.playerPawn.x, this.playerPawn.y - 18, 24, this.carriedLoot.tier);
       this.carriedLootSprite.setScale(0.95);
     }
 
@@ -495,6 +579,10 @@ export class OceanScene extends Phaser.Scene {
   refreshShipCargoVisuals() {
     this.shipCargoSprites.forEach((s) => s.destroy());
     this.shipCargoSprites = [];
+    if (this.shipCargoOverflowLabel) {
+      this.shipCargoOverflowLabel.destroy();
+      this.shipCargoOverflowLabel = null;
+    }
 
     const count = this.state.cargo.length;
     if (!count) return;
@@ -506,12 +594,18 @@ export class OceanScene extends Phaser.Scene {
       const row = Math.floor(i / cols);
       const x = -24 + col * 8;
       const y = -6 + row * 7;
-      const crate = this.createLootCrateSprite(0, 0, 11);
+      const cargoItem = this.state.cargo[count - maxVisual + i];
+      const crate = this.createLootCrateSprite(0, 0, 11, cargoItem?.tier ?? 'driftwoodFinds');
       crate.x = x;
       crate.y = y;
       crate.setScale(0.5);
       this.playerShip.add(crate);
       this.shipCargoSprites.push(crate);
+    }
+
+    if (count > maxVisual) {
+      this.shipCargoOverflowLabel = this.add.text(26, -22, `x${count}`, { fontSize: '11px', color: '#fff6cc', fontStyle: 'bold' }).setDepth(12);
+      this.playerShip.add(this.shipCargoOverflowLabel);
     }
   }
 
@@ -1625,11 +1719,13 @@ export class OceanScene extends Phaser.Scene {
             const cd = Phaser.Math.Between(16, Math.max(22, Math.floor(fort.island.radius * 0.45)));
             const cx = fort.island.x + Math.cos(ca) * cd;
             const cy = fort.island.y + Math.sin(ca) * cd;
-            const cb = this.add.rectangle(cx, cy + 5, 20, 12, 0x5d351f).setDepth(7);
-            const cl = this.add.rectangle(cx, cy - 1, 20, 7, 0xc9963f).setDepth(8);
-            const ck = this.add.rectangle(cx, cy + 2, 5, 5, 0xdeb359).setDepth(8.2);
-            const cs = this.add.circle(cx + 11, cy - 9, 3, 0xffe8a8, 0.9).setDepth(9);
-            this.lootNodes.push({ x: cx, y: cy, taken: false, zone: fort.island.zone, sourceType: bossVault ? 'bossVault' : 'seafortVault', valueMult: bossVault ? 2.6 : 1, islandId: fort.island.id, requiresDive: false, sprites: [cb, cl, cs, ck] });
+            this.createLootNodeAt(cx, cy, {
+              zone: fort.island.zone,
+              sourceType: bossVault ? 'bossVault' : 'seafortVault',
+              valueMult: bossVault ? 2.6 : 1,
+              islandId: fort.island.id,
+              requiresDive: false
+            });
           }
           this.pushToast(bossVault
             ? `Boss Vault opened! ${chestCount} high-value treasure chests inside!`
@@ -1655,6 +1751,20 @@ export class OceanScene extends Phaser.Scene {
           this.pushToast('Fort flag raised! Defeat the defenders to claim the vault key.');
           return;
         }
+      }
+    }
+
+    if (this.onFoot && Phaser.Input.Keyboard.JustDown(this.keys.interact)) {
+      const barrel = this.findNearestSupplyBarrel(34, this.playerPawn.x, this.playerPawn.y);
+      if (barrel) {
+        barrel.used = true;
+        for (const s of barrel.sprites) {
+          if (s.setFillStyle) s.setFillStyle(0x393939);
+          if (s.setAlpha) s.setAlpha(0.8);
+        }
+        const refill = this.state.replenishSupplies();
+        this.pushToast(refill.reason);
+        return;
       }
     }
 
@@ -1710,7 +1820,7 @@ export class OceanScene extends Phaser.Scene {
         this.pushToast('Shipwreck loot requires diving [T].');
       } else {
         const zone = ZONES.find((z) => z.key === pickupNode.zone);
-        const treasure = this.state.rollTreasure(zone?.danger ?? 1);
+        const treasure = this.state.rollTreasure(zone?.danger ?? 1, pickupNode.treasureTier ?? null);
         treasure.fromType = pickupNode.sourceType;
         if (pickupNode.valueMult && pickupNode.valueMult > 1) {
           treasure.baseValue = Math.floor(treasure.baseValue * pickupNode.valueMult);
