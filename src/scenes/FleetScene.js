@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { SHIP_CLASSES } from '../data/gddData.js';
+import { saveProfile } from '../systems/ProfileSystem.js';
 
 export class FleetScene extends Phaser.Scene {
   constructor() {
@@ -69,11 +70,17 @@ export class FleetScene extends Phaser.Scene {
       d: this.input.keyboard.addKey('D')
     };
 
+    // UI Panel for selected ship (fixed to screen)
+    this.createSelectionPanel();
+
     // Escape to return to menu
     this.input.keyboard.on('keydown-ESC', () => this.scene.start('MenuScene'));
 
     // Instructions
-    this.add.text(baseX, worldHeight - 40, 'Arrow keys or WASD to walk • ESC to return', { fontSize: '12px', color: '#6f8fa6' }).setOrigin(0.5);
+    this.add.text(baseX, worldHeight - 40, 'Arrow keys or WASD to walk • Click a ship • ESC to return', { fontSize: '12px', color: '#6f8fa6' }).setOrigin(0.5);
+
+    // Track selected ship
+    this.selectedShipIndex = null;
   }
 
   createGoldPile(x, y) {
@@ -155,11 +162,11 @@ export class FleetScene extends Phaser.Scene {
         shipY = dockY - (dockLength / 2 - 70) + idx * 120;
       }
 
-      this.createShipSprite(shipX, shipY, shipKey);
+      this.createShipSprite(shipX, shipY, shipKey, idx);
     });
   }
 
-  createShipSprite(x, y, shipKey) {
+  createShipSprite(x, y, shipKey, shipIndex) {
     const ship = SHIP_CLASSES[shipKey];
     if (!ship) return;
 
@@ -191,9 +198,85 @@ export class FleetScene extends Phaser.Scene {
       label.setColor('#ffd700');
     });
     hull.on('pointerout', () => {
-      hull.setFillStyle(0x2a5f7f);
-      label.setColor('#eef8ff');
+      if (this.selectedShipIndex !== shipIndex) {
+        hull.setFillStyle(0x2a5f7f);
+        label.setColor('#eef8ff');
+      }
     });
+    
+    // Click to select ship
+    hull.on('pointerdown', () => {
+      this.selectShip(shipIndex, shipKey, ship);
+      hull.setFillStyle(0x4aaf2f);
+      label.setColor('#ffd700');
+    });
+  }
+
+  selectShip(shipIndex, shipKey, ship) {
+    this.selectedShipIndex = shipIndex;
+    this.selectedShipKey = shipKey;
+    this.updateSelectionPanel(ship);
+  }
+
+  createSelectionPanel() {
+    const width = this.scale.width;
+    const height = this.scale.height;
+    
+    // Panel background
+    const panelBg = this.add.rectangle(20 + 140, height - 80, 280, 160, 0x081722, 0.95);
+    panelBg.setStrokeStyle(2, 0x31526d, 0.8);
+    panelBg.setScrollFactor(0, 0); // Fixed to screen
+    panelBg.setDepth(100);
+
+    this.selectionPanel = {
+      bg: panelBg,
+      title: this.add.text(20 + 140, height - 150, 'Click a ship', { fontSize: '14px', color: '#ffe7b0', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0, 0).setDepth(101),
+      stats: this.add.text(20 + 140, height - 110, '', { fontSize: '12px', color: '#eef8ff' }).setOrigin(0.5).setScrollFactor(0, 0).setDepth(101),
+      buttons: {
+        sail: this.createFixedButton(20 + 60, height - 55, 110, 30, 'SET SAIL', () => this.sailShip()).setScrollFactor(0, 0).setDepth(101),
+        flagship: this.createFixedButton(20 + 220, height - 55, 110, 30, 'SET FLAGSHIP', () => this.setFlagship()).setScrollFactor(0, 0).setDepth(101)
+      }
+    };
+  }
+
+  createFixedButton(x, y, width, height, label, callback) {
+    const bg = this.add.rectangle(x, y, width, height, 0x1f4762, 0.9).setStrokeStyle(1, 0x4a90e2, 0.9);
+    const text = this.add.text(x, y, label, { fontSize: '11px', color: '#c5e7ff', fontStyle: 'bold' }).setOrigin(0.5);
+    
+    bg.setInteractive();
+    bg.on('pointerover', () => {
+      bg.setFillStyle(0x2a5f7f, 0.95);
+      text.setColor('#ffffff');
+    });
+    bg.on('pointerout', () => {
+      bg.setFillStyle(0x1f4762, 0.9);
+      text.setColor('#c5e7ff');
+    });
+    bg.on('pointerdown', callback);
+    
+    return bg;
+  }
+
+  updateSelectionPanel(ship) {
+    this.selectionPanel.title.setText(ship.label);
+    const statsText = `Hull: ${ship.hp}  •  Cannons: ${ship.cannons}\nCargo: ${ship.cargo}  •  Price: ${ship.cost}g`;
+    this.selectionPanel.stats.setText(statsText);
+  }
+
+  sailShip() {
+    if (this.selectedShipKey === undefined) return;
+    // Return to menu and launch with selected ship
+    this.scene.start('MenuScene', { 
+      selectedShip: this.selectedShipKey,
+      profile: this.profile 
+    });
+  }
+
+  setFlagship() {
+    if (this.selectedShipKey === undefined) return;
+    this.profile.flagshipShip = this.selectedShipKey;
+    saveProfile(this.profile);
+    this.selectionPanel.title.setText(`${SHIP_CLASSES[this.selectedShipKey].label} (Flagship)`);
   }
 
   formatGold(amount) {
