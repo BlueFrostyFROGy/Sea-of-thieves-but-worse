@@ -1,0 +1,18 @@
+{
+  "serverId": "cf602d1b-597c-45ec-bac5-6d9454fbbb7f",
+  "createdAt": 1778514711133,
+  "sessionEndAt": 1778529111133,
+  "resetCount": 21,
+  "tick": 39038,
+  "players": [],
+  "ships": [],
+  "treasures": [],
+  "worldEvents": [
+    {
+      "key": "cursedTide",
+      "startedAt": 1778520817290,
+      "endsAt": 1778520847290
+    }
+  ],
+  "recentLegendarySales": []
+}
