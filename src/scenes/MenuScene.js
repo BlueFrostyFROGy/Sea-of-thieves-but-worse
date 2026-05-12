@@ -103,6 +103,13 @@ export class MenuScene extends Phaser.Scene {
   setupLobbyClient() {
     this.lobbyClient = null;
     this.lobbyStatus = 'Offline';
+    const host = window.location.hostname;
+    this.multiplayerAvailable = host === 'localhost' || host === '127.0.0.1' || host === '';
+    if (!this.multiplayerAvailable) {
+      this.lobbyButtons.create.setAlpha(0.35).disableInteractive();
+      this.lobbyButtons.join.setAlpha(0.35).disableInteractive();
+      this.lobbyHint.setText('Multiplayer requires running the game locally (npm run dev).');
+    }
   }
 
   createTabButton(x, y, label, mode) {
@@ -207,6 +214,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   createLobby() {
+    if (!this.multiplayerAvailable) return this.setStatusMessage('Multiplayer only works when running locally.');
     const client = this.connectLobbyClient();
     client.connect({
       name: this.profile?.name ?? 'Captain',
@@ -228,6 +236,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   enterJoinMode() {
+    if (!this.multiplayerAvailable) return this.setStatusMessage('Multiplayer only works when running locally.');
     this.lobbyMode = 'join';
     this.lobbyJoinCode = '';
     this.refreshLobbyUI();
