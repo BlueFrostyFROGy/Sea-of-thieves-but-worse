@@ -8,79 +8,96 @@ export class FleetScene extends Phaser.Scene {
   }
 
   init(data) {
-    this.profile = data?.profile ?? {};
-    this.ownedShips = this.profile.ownedShips ?? ['skiff'];
-    this.gold = this.profile.gold ?? 0;
+    try {
+      this.profile = data?.profile ?? { ownedShips: ['skiff'], gold: 0, flagshipShip: 'skiff' };
+      this.ownedShips = data?.ownedShips ?? this.profile.ownedShips ?? ['skiff'];
+      this.gold = data?.gold ?? this.profile.gold ?? 0;
+      console.log('FleetScene init:', { ownedShips: this.ownedShips, gold: this.gold });
+    } catch (e) {
+      console.error('FleetScene init error:', e);
+      this.ownedShips = ['skiff'];
+      this.gold = 0;
+    }
   }
 
   create() {
-    // Set up camera and world size for walking around
-    const worldWidth = 2400;
-    const worldHeight = 2400;
-    this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
+    try {
+      // Set up camera and world size for walking around
+      const worldWidth = 2400;
+      const worldHeight = 2400;
+      this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
 
-    // Background
-    this.add.rectangle(worldWidth / 2, worldHeight / 2, worldWidth, worldHeight, 0x1a3d4d);
-    this.add.rectangle(worldWidth / 2, worldHeight / 2, worldWidth - 40, worldHeight - 40, 0x0f2834).setStrokeStyle(2, 0x2a7f62, 0.8);
+      // Background
+      this.add.rectangle(worldWidth / 2, worldHeight / 2, worldWidth, worldHeight, 0x1a3d4d);
+      this.add.rectangle(worldWidth / 2, worldHeight / 2, worldWidth - 40, worldHeight - 40, 0x0f2834).setStrokeStyle(2, 0x2a7f62, 0.8);
 
-    // Central base/building
-    const baseX = worldWidth / 2;
-    const baseY = worldHeight / 2;
-    const baseSize = 180;
-    
-    // Base structure
-    this.add.rectangle(baseX, baseY, baseSize, baseSize, 0x3d2817).setStrokeStyle(3, 0x5c4a2f, 1);
-    this.add.text(baseX, baseY - baseSize / 2 - 30, 'Fleet Base', { fontSize: '20px', color: '#ffe7b0', fontStyle: 'bold' }).setOrigin(0.5);
+      // Central base/building
+      const baseX = worldWidth / 2;
+      const baseY = worldHeight / 2;
+      const baseSize = 180;
+      
+      // Base structure
+      this.add.rectangle(baseX, baseY, baseSize, baseSize, 0x3d2817).setStrokeStyle(3, 0x5c4a2f, 1);
+      this.add.text(baseX, baseY - baseSize / 2 - 30, 'Fleet Base', { fontSize: '20px', color: '#ffe7b0', fontStyle: 'bold' }).setOrigin(0.5);
 
-    // Gold pile in base
-    this.createGoldPile(baseX, baseY);
+      // Gold pile in base
+      this.createGoldPile(baseX, baseY);
 
-    // Create docks in 4 directions: North, South, East, West
-    const dockDistance = 400;
-    
-    // North dock
-    this.createDock(baseX, baseY - dockDistance, 'north', 0);
-    
-    // South dock
-    this.createDock(baseX, baseY + dockDistance, 'south', 2);
-    
-    // East dock
-    this.createDock(baseX + dockDistance, baseY, 'east', 1);
-    
-    // West dock
-    this.createDock(baseX - dockDistance, baseY, 'west', 3);
+      // Create docks in 4 directions: North, South, East, West
+      const dockDistance = 400;
+      
+      // North dock
+      this.createDock(baseX, baseY - dockDistance, 'north', 0);
+      
+      // South dock
+      this.createDock(baseX, baseY + dockDistance, 'south', 2);
+      
+      // East dock
+      this.createDock(baseX + dockDistance, baseY, 'east', 1);
+      
+      // West dock
+      this.createDock(baseX - dockDistance, baseY, 'west', 3);
 
-    // Player (walking avatar)
-    this.player = this.physics.add.sprite(baseX, baseY + 100, null);
-    this.player.setDisplaySize(30, 40);
-    this.player.setCollideWorldBounds(true);
-    this.player.setBounce(0.2);
-    this.player.setTint(0x4a90e2);
+      // Player (walking avatar)
+      this.player = this.physics.add.sprite(baseX, baseY + 100, null);
+      this.player.setDisplaySize(30, 40);
+      this.player.setCollideWorldBounds(true);
+      this.player.setBounce(0.2);
+      this.player.setTint(0x4a90e2);
 
-    // Camera follows player
-    this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
-    this.cameras.main.setZoom(0.8);
+      // Camera follows player
+      this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+      this.cameras.main.setZoom(0.8);
 
-    // Input for movement
-    this.cursors = this.input.keyboard.createCursorKeys();
-    this.keys = {
-      w: this.input.keyboard.addKey('W'),
-      a: this.input.keyboard.addKey('A'),
-      s: this.input.keyboard.addKey('S'),
-      d: this.input.keyboard.addKey('D')
-    };
+      // Input for movement
+      this.cursors = this.input.keyboard.createCursorKeys();
+      this.keys = {
+        w: this.input.keyboard.addKey('W'),
+        a: this.input.keyboard.addKey('A'),
+        s: this.input.keyboard.addKey('S'),
+        d: this.input.keyboard.addKey('D')
+      };
 
-    // UI Panel for selected ship (fixed to screen)
-    this.createSelectionPanel();
+      // UI Panel for selected ship (fixed to screen)
+      this.createSelectionPanel();
 
-    // Escape to return to menu
-    this.input.keyboard.on('keydown-ESC', () => this.scene.start('MenuScene'));
+      // Escape to return to menu
+      this.input.keyboard.on('keydown-ESC', () => {
+        console.log('ESC pressed, returning to menu');
+        this.scene.start('MenuScene', { profile: this.profile });
+      });
 
-    // Instructions
-    this.add.text(baseX, worldHeight - 40, 'Arrow keys or WASD to walk • Click a ship • ESC to return', { fontSize: '12px', color: '#6f8fa6' }).setOrigin(0.5);
+      // Instructions
+      this.add.text(baseX, worldHeight - 40, 'Arrow keys or WASD to walk • Click a ship • ESC to return', { fontSize: '12px', color: '#6f8fa6' }).setOrigin(0.5);
 
-    // Track selected ship
-    this.selectedShipIndex = null;
+      // Track selected ship
+      this.selectedShipIndex = null;
+      console.log('FleetScene created successfully');
+    } catch (e) {
+      console.error('FleetScene create error:', e);
+      // Fallback: return to menu
+      this.scene.start('MenuScene');
+    }
   }
 
   createGoldPile(x, y) {

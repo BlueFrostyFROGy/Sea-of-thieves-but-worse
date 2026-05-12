@@ -137,7 +137,16 @@ export class MenuScene extends Phaser.Scene {
 
   setViewMode(mode) {
     if (mode === 'fleet') {
-      return this.scene.start('FleetScene', { profile: this.profile });
+      try {
+        this.scene.start('FleetScene', { 
+          profile: this.profile,
+          ownedShips: this.profile?.ownedShips ?? ['skiff'],
+          gold: this.profile?.gold ?? 0
+        });
+      } catch (e) {
+        console.error('Failed to start FleetScene:', e);
+      }
+      return;
     }
     this.viewMode = mode;
     this.refreshLabels();
