@@ -4,16 +4,7 @@ import { saveProfile } from '../systems/ProfileSystem.js';
 
 export class FleetScene extends Phaser.Scene {
   constructor() {
-    super({
-      key: 'FleetScene',
-      physics: {
-        default: 'arcade',
-        arcade: {
-          gravity: { y: 0 },
-          debug: false
-        }
-      }
-    });
+    super('FleetScene');
   }
 
   init(data) {
@@ -31,10 +22,9 @@ export class FleetScene extends Phaser.Scene {
 
   create() {
     try {
-      // Set up camera and world size for walking around
+      // Set up world size for walking around
       const worldWidth = 2400;
       const worldHeight = 2400;
-      this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
 
       // Background
       this.add.rectangle(worldWidth / 2, worldHeight / 2, worldWidth, worldHeight, 0x1a3d4d);
@@ -67,16 +57,16 @@ export class FleetScene extends Phaser.Scene {
       // West dock
       this.createDock(baseX - dockDistance, baseY, 'west', 3);
 
-      // Player (walking avatar)
-      this.player = this.physics.add.sprite(baseX, baseY + 100, null);
-      this.player.setDisplaySize(30, 40);
-      this.player.setCollideWorldBounds(true);
-      this.player.setBounce(0.2);
-      this.player.setTint(0x4a90e2);
+      // Player (walking avatar) - simple graphics object
+      this.player = this.add.rectangle(baseX, baseY + 100, 30, 40, 0x4a90e2);
+      this.playerX = baseX;
+      this.playerY = baseY + 100;
+      this.playerSpeed = 4;
 
       // Camera follows player
       this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
       this.cameras.main.setZoom(0.8);
+      this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
 
       // Input for movement
       this.cursors = this.input.keyboard.createCursorKeys();
@@ -319,22 +309,27 @@ export class FleetScene extends Phaser.Scene {
   }
 
   update() {
-    // Player movement
-    const speed = 200;
+    // Simple player movement without physics
+    const worldWidth = 2400;
+    const worldHeight = 2400;
+    const minX = 50;
+    const maxX = worldWidth - 50;
+    const minY = 50;
+    const maxY = worldHeight - 50;
+
     if (this.cursors.left.isDown || this.keys.a.isDown) {
-      this.player.setVelocityX(-speed);
-    } else if (this.cursors.right.isDown || this.keys.d.isDown) {
-      this.player.setVelocityX(speed);
-    } else {
-      this.player.setVelocityX(0);
+      this.playerX = Math.max(minX, this.playerX - this.playerSpeed);
+    }
+    if (this.cursors.right.isDown || this.keys.d.isDown) {
+      this.playerX = Math.min(maxX, this.playerX + this.playerSpeed);
+    }
+    if (this.cursors.up.isDown || this.keys.w.isDown) {
+      this.playerY = Math.max(minY, this.playerY - this.playerSpeed);
+    }
+    if (this.cursors.down.isDown || this.keys.s.isDown) {
+      this.playerY = Math.min(maxY, this.playerY + this.playerSpeed);
     }
 
-    if (this.cursors.up.isDown || this.keys.w.isDown) {
-      this.player.setVelocityY(-speed);
-    } else if (this.cursors.down.isDown || this.keys.s.isDown) {
-      this.player.setVelocityY(speed);
-    } else {
-      this.player.setVelocityY(0);
-    }
+    this.player.setPosition(this.playerX, this.playerY);
   }
 }
