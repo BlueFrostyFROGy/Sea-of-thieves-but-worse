@@ -593,23 +593,24 @@ export class OceanScene extends Phaser.Scene {
     if (!count) return;
 
     const maxVisual = Math.min(count, 64);
-    const cols = 8;
+    const cols = 12;
+    const visualScale = count > 24 ? 0.18 : count > 12 ? 0.22 : 0.28;
     for (let i = 0; i < maxVisual; i++) {
       const col = i % cols;
       const row = Math.floor(i / cols);
-      const x = -24 + col * 8;
-      const y = -6 + row * 7;
+      const x = -28 + col * 5;
+      const y = -8 + row * 5;
       const cargoItem = this.state.cargo[count - maxVisual + i];
       const crate = this.createLootCrateSprite(0, 0, 11, cargoItem?.tier ?? 'driftwoodFinds');
       crate.x = x;
       crate.y = y;
-      crate.setScale(0.5);
+      crate.setScale(visualScale);
       this.playerShip.add(crate);
       this.shipCargoSprites.push(crate);
     }
 
     if (count > maxVisual) {
-      this.shipCargoOverflowLabel = this.add.text(26, -22, `x${count}`, { fontSize: '11px', color: '#fff6cc', fontStyle: 'bold' }).setDepth(12);
+      this.shipCargoOverflowLabel = this.add.text(30, -24, `x${count}`, { fontSize: '10px', color: '#fff6cc', fontStyle: 'bold' }).setDepth(12);
       this.playerShip.add(this.shipCargoOverflowLabel);
     }
   }
