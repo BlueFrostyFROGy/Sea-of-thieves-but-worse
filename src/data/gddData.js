@@ -6,10 +6,10 @@ export const ZONES = [
 ];
 
 export const SHIP_CLASSES = {
-  skiff: { label: 'Skiff', hp: 800, cannons: 2, sails: 1, cargo: 4, turnRate: 0.12, accel: 8.3, drag: 0.988, anchorRaiseSec: 2.5, minCrew: 1, optimalCrew: 2, maxCrew: 2 },
-  brigantine: { label: 'Brigantine', hp: 1600, cannons: 4, sails: 2, cargo: 10, turnRate: 0.1, accel: 7.6, drag: 0.986, anchorRaiseSec: 4, minCrew: 1, optimalCrew: 3, maxCrew: 4 },
-  galleon: { label: 'Galleon', hp: 3200, cannons: 8, sails: 4, cargo: 24, turnRate: 0.075, accel: 6.8, drag: 0.983, anchorRaiseSec: 6, minCrew: 2, optimalCrew: 6, maxCrew: 8 },
-  warship: { label: 'Warship', hp: 5000, cannons: 12, sails: 5, cargo: 32, turnRate: 0.06, accel: 6.4, drag: 0.981, anchorRaiseSec: 7.5, minCrew: 4, optimalCrew: 7, maxCrew: 8 }
+  skiff: { label: 'Skiff', cost: 0, hp: 800, cannons: 2, sails: 1, cargo: 4, turnRate: 0.12, accel: 8.3, drag: 0.988, anchorRaiseSec: 2.5, minCrew: 1, optimalCrew: 2, maxCrew: 2 },
+  brigantine: { label: 'Brigantine', cost: 3000, hp: 1600, cannons: 4, sails: 2, cargo: 10, turnRate: 0.1, accel: 7.6, drag: 0.986, anchorRaiseSec: 4, minCrew: 1, optimalCrew: 3, maxCrew: 4 },
+  galleon: { label: 'Galleon', cost: 9000, hp: 3200, cannons: 8, sails: 4, cargo: 24, turnRate: 0.075, accel: 6.8, drag: 0.983, anchorRaiseSec: 6, minCrew: 2, optimalCrew: 6, maxCrew: 8 },
+  warship: { label: 'Warship', cost: 18000, hp: 5000, cannons: 12, sails: 5, cargo: 32, turnRate: 0.06, accel: 6.4, drag: 0.981, anchorRaiseSec: 7.5, minCrew: 4, optimalCrew: 7, maxCrew: 8 }
 };
 
 export const FACTIONS = {
