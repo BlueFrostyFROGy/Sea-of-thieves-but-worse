@@ -233,8 +233,16 @@ export class FleetScene extends Phaser.Scene {
       title: this.add.text(20 + 140, height - 150, 'Click a ship', { fontSize: '14px', color: '#ffe7b0', fontStyle: 'bold' }).setOrigin(0.5).setScrollFactor(0, 0).setDepth(101),
       stats: this.add.text(20 + 140, height - 110, '', { fontSize: '12px', color: '#eef8ff' }).setOrigin(0.5).setScrollFactor(0, 0).setDepth(101),
       buttons: {
-        sail: this.createFixedButton(20 + 60, height - 55, 110, 30, 'SET SAIL', () => this.sailShip()).setScrollFactor(0, 0).setDepth(101),
-        flagship: this.createFixedButton(20 + 220, height - 55, 110, 30, 'SET FLAGSHIP', () => this.setFlagship()).setScrollFactor(0, 0).setDepth(101)
+        sail: this.createFixedButton(20 + 60, height - 55, 110, 30, 'SET SAIL', () => {
+          if (this.selectedShipKey !== undefined) {
+            this.sailShip();
+          }
+        }).setScrollFactor(0, 0).setDepth(101),
+        flagship: this.createFixedButton(20 + 220, height - 55, 110, 30, 'SET FLAGSHIP', () => {
+          if (this.selectedShipKey !== undefined) {
+            this.setFlagship();
+          }
+        }).setScrollFactor(0, 0).setDepth(101)
       }
     };
   }
@@ -252,7 +260,9 @@ export class FleetScene extends Phaser.Scene {
       bg.setFillStyle(0x1f4762, 0.9);
       text.setColor('#c5e7ff');
     });
-    bg.on('pointerdown', callback);
+    bg.on('pointerdown', () => {
+      callback();
+    });
     
     return bg;
   }
@@ -265,11 +275,8 @@ export class FleetScene extends Phaser.Scene {
 
   sailShip() {
     if (this.selectedShipKey === undefined) return;
-    // Return to menu and launch with selected ship
-    this.scene.start('MenuScene', { 
-      selectedShip: this.selectedShipKey,
-      profile: this.profile 
-    });
+    // Return to menu
+    this.scene.start('MenuScene', { profile: this.profile });
   }
 
   setFlagship() {
