@@ -136,6 +136,9 @@ export class MenuScene extends Phaser.Scene {
   }
 
   setViewMode(mode) {
+    if (mode === 'fleet') {
+      return this.scene.start('FleetScene', { profile: this.profile });
+    }
     this.viewMode = mode;
     this.refreshLabels();
   }

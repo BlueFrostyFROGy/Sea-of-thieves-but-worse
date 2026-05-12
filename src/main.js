@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { BootScene } from './scenes/BootScene.js';
 import { MenuScene } from './scenes/MenuScene.js';
 import { OceanScene } from './scenes/OceanScene.js';
+import { FleetScene } from './scenes/FleetScene.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -9,7 +10,7 @@ const config = {
   width: window.innerWidth,
   height: window.innerHeight,
   backgroundColor: '#07131f',
-  scene: [BootScene, MenuScene, OceanScene],
+  scene: [BootScene, MenuScene, OceanScene, FleetScene],
   render: {
     antialias: true,
     pixelArt: false
