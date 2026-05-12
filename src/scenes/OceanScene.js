@@ -1671,32 +1671,40 @@ export class OceanScene extends Phaser.Scene {
 
     if (Phaser.Input.Keyboard.JustDown(this.keys.sell) && nearestOutpost) {
       const npc = nearestOutpost.outpostNpc;
-      const npcDist = npc ? Phaser.Math.Distance.Between(this.playerPawn.x, this.playerPawn.y, npc.x, npc.y) : Infinity;
+      if (!npc) {
+        this.pushToast('NPC not found at outpost.');
+        return;
+      }
+      const npcDist = Phaser.Math.Distance.Between(this.playerPawn.x, this.playerPawn.y, npc.x, npc.y);
       if (!this.onFoot) {
         this.pushToast('Walk to the outpost NPC to sell your cargo.');
-      } else if (npcDist <= 68) {
-        if (this.carriedLoot) {
-          const sold = this.carriedLoot;
-          const sale = this.state.sellCargoItem(sold);
-          this.carriedLoot = null;
-          if (this.carriedLootSprite) {
-            this.carriedLootSprite.destroy();
-            this.carriedLootSprite = null;
-          }
-          this.state.unbankedRep = 0;
-          this.pushToast(`Sold ${sold.name} to the outpost merchant for ${sale.total} gold.`);
-          if (sold.tier === 'legendaryRelics' && this.network?.connected) {
-            this.network.sendMessage({
-              type: 'legendary:sale',
-              itemName: sold.name,
-              value: sold.baseValue
-            });
-          }
-        } else if (this.state.cargo.length > 0) {
-          this.pushToast('Pick up a crate from your ship first with [F], then sell it to the merchant.');
-        } else {
-          this.pushToast('You have no loot to sell.');
+        return;
+      }
+      if (npcDist > 68) {
+        this.pushToast('Get closer to the merchant to sell.');
+        return;
+      }
+      if (this.carriedLoot) {
+        const sold = this.carriedLoot;
+        const sale = this.state.sellCargoItem(sold);
+        this.carriedLoot = null;
+        if (this.carriedLootSprite) {
+          this.carriedLootSprite.destroy();
+          this.carriedLootSprite = null;
         }
+        this.state.unbankedRep = 0;
+        this.pushToast(`Sold ${sold.name} to the outpost merchant for ${sale.total} gold.`);
+        if (sold.tier === 'legendaryRelics' && this.network?.connected) {
+          this.network.sendMessage({
+            type: 'legendary:sale',
+            itemName: sold.name,
+            value: sold.baseValue
+          });
+        }
+      } else if (this.state.cargo.length > 0) {
+        this.pushToast('Pick up a crate from your ship first with [F], then sell it to the merchant.');
+      } else {
+        this.pushToast('You have no loot to sell.');
       }
     }
 
